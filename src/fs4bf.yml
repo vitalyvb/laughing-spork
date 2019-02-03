@@ -1,0 +1,16 @@
+---
+- begin
+- - define
+  - fac'
+  - - lambda
+    - [ x, acc ]
+    - [ if, [ '=', x, 1 ], acc, [ fac', ['-',  x, 1 ], [ '*', acc, x ] ]]
+
+- - define
+  - fac
+  - - lambda
+    - [ x ]
+    - [ fac', x, 1 ]
+
+- [ fac, 5000 ]
+

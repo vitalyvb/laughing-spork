@@ -1,0 +1,30 @@
+---
+- begin
+- - define
+  - val
+  - 2
+- - if
+  - null
+  - - define
+    - "val"
+    - - '*'
+      - val
+      - 3
+  - - define
+    - val
+    - - '*'
+      - val
+      - 5
+- - if
+  - []
+  - - define
+    - val
+    - - '*'
+      - val
+      - 7
+  - - define
+    - val
+    - - '*'
+      - val
+      - 11
+- val

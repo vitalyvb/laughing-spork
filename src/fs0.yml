@@ -1,0 +1,8 @@
+---
+- begin
+- - define
+  - val
+  - - '*'
+    - 2
+    - 2
+- val
