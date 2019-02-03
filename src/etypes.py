@@ -57,6 +57,8 @@ class _Value(Token):
 #        return self._v.__hash__()
 
     def __eq__(self, other):
+        if isinstance(other, _Value):
+            return self._v.__eq__(other._v)
         return self._v.__eq__(other)
 
 class Num(_Value):

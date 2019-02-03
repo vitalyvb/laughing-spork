@@ -1,0 +1,35 @@
+---
+- begin
+- - define
+  - inverse
+  - - lambda
+    - - x
+    - - begin
+      - - '*'
+        - x
+        - -1
+- - define
+  - add2
+  - - lambda
+    - - x
+    - - begin
+      - - '+'
+        - x
+        - 2
+- - define
+  - compose
+  - - lambda
+    - - f
+      - g
+    - - lambda
+      - - x
+      - - f
+        - - g
+          - x
+- - define
+  - comp
+  - - compose
+    - inverse
+    - add2
+- - comp
+  - 10
