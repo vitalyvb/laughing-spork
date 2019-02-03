@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from collections import namedtuple
-
+from collections.abc import Iterable
 
 class Token(object):
     def __init__(self, start, end):
@@ -213,7 +213,10 @@ class Lambda(Token):
         r = []
         r.append(align("λ ") + repr(self._params.v))
         r.append(align(":="))
-        r.extend(x.format(align2) for x in self._exp)
+        if isinstance(self._exp, Iterable):
+            r.extend(x.format(align2) for x in self._exp)
+        else:
+            r.append(self._exp.format(align2))
         r.append(align("."))
 
         return "\n".join(r)

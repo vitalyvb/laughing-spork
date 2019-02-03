@@ -8,6 +8,11 @@ class ParseError(Exception):
 
 def comp_to_ast(comp):
 
+    def list_or_one(items):
+        if len(items) == 1:
+            return items[0]
+        return items
+
     def ast_define(s, e, items):
         l = len(items)
         if l != 2:
@@ -64,7 +69,10 @@ def comp_to_ast(comp):
             print("-- unexpected item")
             raise ParseError()
         args = ast_sym_list(items[0])
-        exps = list(map(astize, items[1:]))
+#        exps = list(map(astize, items[1:]))
+#        exps = Apply(0,0, Sym(s,s,"begin"), list(map(astize, items[1:])))
+#        exps = List(items[1].start_mark, items[-1].end_mark, list(map(astize, items[1:])))
+        exps = list_or_one(list(map(astize, items[1:])))
         return Lambda(s, e, args, exps)
 
     def ast_apply(s, e, fst, items):

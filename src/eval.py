@@ -69,6 +69,10 @@ def eval1(env, exp):
                 r.append(eval1(env2, i))
             return EList(r)
 
+        if isinstance(exp, list) and exp == []:
+            exp = ENil()
+            continue
+
         if isinstance(exp, list):
             tail = exp[-1]
             env2 = env.copy()
@@ -84,7 +88,8 @@ def eval1(env, exp):
             return ENil()
 
         if callable(exp):
-            return exp(eval1, env)
+            exp = exp(eval1, env)
+            continue
 
         if isinstance(exp, Apply):
             f = env[exp.sym.v]
@@ -166,7 +171,7 @@ def get_prelude_env():
 
     _id = lambda x:x
 
-    define(_id, "begin", ["&rest", "args"], lambda args: reduce(lambda _,b: b, args.v, ENil()) )
+    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
 
 #    define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.list))[0] )
 
@@ -180,42 +185,36 @@ def get_prelude_env():
     return prelude
 
 
-class Test_Env(unittest.TestCase):
-
-    def test_begin(self):
-        env = get_prelude_env()
-        f = env['begin']
-        self.assertIsInstance(f, Lambda)
-        self.assertTrue(callable(f.exp), msg="f.exp is callable")
-
-        def eval_f1(env, exp):
-            if isinstance(exp, Sym):
-                exp = env[exp.v]
-            return exp
-
-        with self.subTest("begin returns last"):
-            env2 = {
-                "args": EList(["12", "34"])
-            }
-            res = f.exp(eval_f1, env2)
-            self.assertEqual(res, "34")
-
-
-        with self.subTest("begin returns nil if empty"):
-            env2 = {
-                "args": EList([])
-            }
-            res = f.exp(eval_f1, env2)
-            self.assertIsInstance(res, Nil)
-
-
 class Test_Eval(unittest.TestCase):
 
     def setUp(self):
         self.env = get_prelude_env()
 
-    def test_define(self):
 
+    def test_unhandled1(self):
+        class _Unhandled(object):
+            pass
+        p = _Unhandled()
+        with self.assertRaises(Exception):
+            eval1(self.env, p)
+
+
+    def test_begin1(self):
+        p = Apply(0,0, ESym("begin"), [
+                ENum(21),
+                ENum(42)
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 42)
+
+    def test_begin2(self):
+        p = Apply(0,0, ESym("begin"), [])
+        res = eval1(self.env, p)
+        self.assertIsInstance(res, Nil)
+
+
+    def test_define(self):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("a"), ENum(12)),
                 Def(0,0, ESym("a"), ENum(42)),
@@ -438,6 +437,15 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 15)
 
+    def test_lambda10(self):
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("f"), ELambda(EList([ESym("x"), ESym("y")]), [ESym("x"), ESym("y")])),
+                Apply(0,0, ESym("f"), [ENum(11), ENum(22)])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 22)
+
 
     def test_tail_call(self):
         def add(s, n):
@@ -450,6 +458,24 @@ class Test_Eval(unittest.TestCase):
                             Apply(0,0, ESym("f"), [add("acc", ESym("x")),
                                                    add("x", ENum(-1))])
                     ))),
+                Apply(0,0, ESym("f"), [ENum(0), ENum(1000)])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 500500)
+
+    def test_tail_call2(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), n])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("f"), ELambda(EList([ESym("acc"), ESym("x")]),
+                    Apply(0,0, ESym("begin"), [
+                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                                ESym("acc"),
+                                Apply(0,0, ESym("f"), [add("acc", ESym("x")),
+                                                   add("x", ENum(-1))]))
+                    ]))),
                 Apply(0,0, ESym("f"), [ENum(0), ENum(1000)])
             ])
 
