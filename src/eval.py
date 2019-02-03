@@ -22,120 +22,231 @@ def ELambda(v, e):
     return Lambda(0, 0, v, e)
 
 
+class Frame(object):
+    def __init__(self, env, exp, data, cont):
+        self.env = env
+        self.exp = exp
+        self.data = data
+        self.cont = cont
+
+recurs = 0
+
 def eval1(env, exp):
+    global recurs
+    recurs += 1
+
+    print("eval1 recursion level: {}".format(recurs))
+
+    stack = []
+
+    def s_push(cont, data):
+        stack.append(Frame(env, exp, data, cont))
+
+    def s_pop():
+        frame = stack.pop()
+        return frame
+
+
+#    def op_if(env, exp):
+#        v = eval1(env, exp.exp)
+#        if not isinstance(v, Nil):
+#            exp = exp.thn
+#        else:
+#            exp = exp.els
+#        return exp
+
+    def op_if(env, exp):
+        s_push(op_if2, exp)
+        return exp.exp
+
+    def op_if2(env, exp, _cexp, cdata):
+        if not isinstance(exp, Nil):
+            exp = cdata.thn
+        else:
+            exp = cdata.els
+        return exp
+
+
+#    def op_def(env, exp):
+#        env[exp.sym.v] = eval1(env, exp.exp)
+#        return ENil()
+
+    def op_def(env, exp):
+        s_push(op_def2, exp)
+        return exp.exp
+
+    def op_def2(env, exp, _cexp, cdata):
+        env[cdata.sym.v] = exp
+        return ENil()
+
+
+#    def op_list(env, exp):
+#        r = []
+#        env2 = env.copy()
+#        for i in exp.v:
+#            r.append(eval1(env2, i))
+#        return EList(r)
+
+
+    def op_list(env, exp):
+        if len(exp.v) == 0:
+            return (exp,)
+        s_push(op_list2, (exp, []))
+        return exp.v[0]
+
+    def op_list2(env, exp, _cexp, cdata):
+        cdata, acc = cdata
+        acc.append(exp)
+
+        if len(acc) >= len(cdata.v):
+            return (EList(acc),)
+
+        s_push(op_list2, (cdata, acc))
+        return cdata.v[len(acc)]
+
+
+#    def op_pylist(env, exp):
+#        tail = exp[-1]
+#        for i in exp[:-1]:
+#            eval1(env, i)
+#        exp = tail
+#        return tail
+
+    def op_pylist(env, exp):
+        if len(exp) > 1:
+            s_push(op_pylist2, (exp, []))
+        return exp[0]
+
+    def op_pylist2(env, exp, _cexp, cdata):
+        cdata, acc = cdata
+        acc.append(exp)
+
+        if len(acc) >= len(cdata)-1:
+            return cdata[len(acc)]
+
+        s_push(op_pylist2, (cdata, acc))
+        return cdata[len(acc)]
 
 
     while True:
 
-        if 0 and hasattr(exp, 'start') and exp.start != 0:
-            l = exp.start.buffer.splitlines()
-            ln = exp.start.line
-            cn = exp.start.column
+        while True:
 
-            if isinstance(exp, Sym) and exp.v in env and isinstance(env[exp.v], (Num,Str)):
-                val = "--  {} = {}".format(exp.v, env[exp.v].v)
-            else:
-                val = ""
+            if len(stack) > 1:
+                print("my stack size: {}".format(len(stack)))
 
-            print("{:3}: {}".format(ln-2, l[ln-2]))
-            print("{:3}: {}".format(ln-1, l[ln-1]))
-            print("{:3}: {}".format(ln, l[ln]))
-            print("     "+" "*cn+"^"+val)
+            if 0 and hasattr(exp, 'start') and exp.start != 0:
+                l = exp.start.buffer.splitlines()
+                ln = exp.start.line
+                cn = exp.start.column
 
-#            print(exp.start)
-            time.sleep(0.3)
+                if isinstance(exp, Sym) and exp.v in env and isinstance(env[exp.v], (Num,Str)):
+                    val = "--  {} = {}".format(exp.v, env[exp.v].v)
+                else:
+                    val = ""
 
-        if isinstance(exp, Sym):
-            exp = env[exp.v]
+                print("{:3}: {}".format(ln-2, l[ln-2]))
+                print("{:3}: {}".format(ln-1, l[ln-1]))
+                print("{:3}: {}".format(ln, l[ln]))
+                print("     "+" "*cn+"^"+val)
 
-        if isinstance(exp, If):
-            v = eval1(env, exp.exp)
-            if not isinstance(v, Nil):
-                exp = exp.thn
-            else:
-                exp = exp.els
-            continue
+#                print(exp.start)
+                time.sleep(0.3)
 
-        if isinstance(exp, Lambda):
-            return Closure(env.copy(), exp.params, exp.exp)
 
-        if isinstance(exp, (Nil, Num, Str, Lambda, Closure)):
+            if isinstance(exp, type((0,))):
+                exp = exp[0]
+                break
+
+            if isinstance(exp, Sym):
+                exp = env[exp.v]
+
+            if isinstance(exp, If):
+                exp = op_if(env, exp)
+                continue
+
+            if isinstance(exp, Lambda):
+                exp = Closure(env.copy(), exp.params, exp.exp)
+                break
+
+            if isinstance(exp, (Nil, Num, Str, Lambda, Closure)):
+                break
+
+            if isinstance(exp, List):
+                exp = op_list(env, exp)
+                continue
+
+            if isinstance(exp, list) and exp == []:
+                exp = ENil()
+                break
+
+            if isinstance(exp, list):
+                exp = op_pylist(env, exp)
+                continue
+
+            if isinstance(exp, Def):
+                exp = op_def(env, exp)
+                continue
+
+            if callable(exp):
+                exp = exp(eval1, env)
+                continue
+
+            if isinstance(exp, Apply):
+                f = env[exp.sym.v]
+                env2 = env.copy()
+
+                try:
+                    for n, x in enumerate(f.params.v):
+                        if x.v == "&rest":
+                            p = n
+                            break
+                    else:
+                        raise ValueError()
+                    args = f.params.v[:p]
+                    argv = f.params.v[p+1]
+
+                except ValueError:
+                    args = f.params.v
+                    argv = None
+
+                if len(args) > len(exp.args):
+                    raise Exception("not enough arguments to call {}".format(f))
+
+
+                for arg, val in zip(args, exp.args):
+                    env2[arg.v] = eval1(env, val)
+
+
+                if argv is not None:
+                    agg = []
+                    for val in exp.args[len(args):]:
+                        agg.append(val)
+
+                    env2[argv.v] = EList(agg)
+
+                if isinstance(f, Closure):
+                    # why the hell this works at all?
+                    # because of no variable names conflict?
+                    env2.update(f.env)
+
+                env = env2
+                exp = f.exp
+                continue
+
+
+            print(exp)
+            raise Exception("Eval '{}' not implemented".format(type(exp)))
+
+        if stack == []:
+            recurs -= 1
             return exp
 
-        if isinstance(exp, List):
-            r = []
-            env2 = env.copy()
-            for i in exp.v:
-                r.append(eval1(env2, i))
-            return EList(r)
+        frame = s_pop()
+        env = frame.env
+        exp = frame.cont(env, exp, frame.exp, frame.data)
 
-        if isinstance(exp, list) and exp == []:
-            exp = ENil()
-            continue
-
-        if isinstance(exp, list):
-            tail = exp[-1]
-            env2 = env.copy()
-            for i in exp[:-1]:
-                eval1(env2, i)
-            env = env2
-            exp = tail
-
-            continue
-
-        if isinstance(exp, Def):
-            env[exp.sym.v] = eval1(env, exp.exp)
-            return ENil()
-
-        if callable(exp):
-            exp = exp(eval1, env)
-            continue
-
-        if isinstance(exp, Apply):
-            f = env[exp.sym.v]
-            env2 = env.copy()
-
-            try:
-                for n, x in enumerate(f.params.v):
-                    if x.v == "&rest":
-                        p = n
-                        break
-                else:
-                    raise ValueError()
-                args = f.params.v[:p]
-                argv = f.params.v[p+1]
-
-            except ValueError:
-                args = f.params.v
-                argv = None
-
-            if len(args) > len(exp.args):
-                raise Exception("not enough arguments to call {}".format(f))
-
-
-            for arg, val in zip(args, exp.args):
-                env2[arg.v] = eval1(env, val)
-
-
-            if argv is not None:
-                agg = []
-                for val in exp.args[len(args):]:
-                    agg.append(val)
-
-                env2[argv.v] = EList(agg)
-
-            if isinstance(f, Closure):
-                # why the hell this works at all?
-                # because of no variable names conflict?
-                env2.update(f.env)
-
-            env = env2
-            exp = f.exp
-            continue
-
-
-        print(exp)
-        raise Exception("Eval '{}' not implemented".format(type(exp)))
+    recurs -= 1
 
 
 def get_prelude_env():
