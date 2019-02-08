@@ -3,6 +3,7 @@
 from functools import reduce
 import time
 import unittest
+from collections import deque
 
 from etypes import *
 
@@ -35,9 +36,17 @@ def eval1(env, exp):
     global recurs
     recurs += 1
 
-    print("eval1 recursion level: {}".format(recurs))
+#    print("eval1 recursion level: {}".format(recurs))
 
-    stack = []
+    try:
+        return eval2(env, exp)
+    finally:
+        recurs -= 1
+
+
+def eval2(env, exp):
+
+    stack = deque()
 
     def s_push(cont, data):
         stack.append(Frame(env, exp, data, cont))
@@ -127,13 +136,96 @@ def eval1(env, exp):
         s_push(op_pylist2, (cdata, acc))
         return cdata[len(acc)]
 
+#    def op_apply(env, exp):
+#        f = env[exp.sym.v]
+#
+#        try:
+#            for n, x in enumerate(f.params.v):
+#                if x.v == "&rest":
+#                    p = n
+#                    break
+#            else:
+#                raise ValueError()
+#            args = f.params.v[:p]
+#            argv = f.params.v[p+1]
+#
+#        except ValueError:
+#            args = f.params.v
+#            argv = None
+#
+#        if len(args) > len(exp.args):
+#            raise Exception("not enough arguments to call {}".format(f))
+#
+#        for arg, val in zip(args, exp.args):
+#            env[arg.v] = eval1(env, val)
+#
+#        if argv is not None:
+#            agg = []
+#            for val in exp.args[len(args):]:
+#                # not evaluated, probably bug, but needed for tail call optimization for begin
+#                agg.append(val)
+#
+#            env[argv.v] = EList(agg)
+#
+#        if isinstance(f, Closure):
+#            # why the hell this works at all?
+#            # because of no variable names conflict?
+#            env.update(f.env)
+#
+#        return f.exp
+
+    def op_apply(env, exp):
+        if exp.sym.v == "begin":
+            return exp.args
+
+        f = env[exp.sym.v]
+
+        for n, x in enumerate(f.params.v):
+            if x.v == "&rest":
+                p = n
+                args = f.params.v[:p]
+                argv = f.params.v[p+1]
+                break
+        else:
+            args = f.params.v
+            argv = None
+
+
+        if len(args) > len(exp.args):
+            raise Exception("not enough arguments to call {}".format(f))
+
+        ctx = (f, args, argv)
+        largs = exp.args
+
+        s_push(op_apply2, ctx)
+        return EList(largs)
+
+    def op_apply2(env, exp, _cexp, cdata):
+        (f, args, argv) = cdata
+
+        for arg, val in zip(args, exp.v):
+            env[arg.v] = val
+
+        if argv is not None:
+            env[argv.v] = EList(exp.v[len(args):])
+
+        if isinstance(f, Closure):
+            # why the hell this works at all?
+            # because of no variable names conflict?
+            env.update(f.env)
+
+        return f.exp
+
+    def op_callable(env, exp):
+        return exp(env)
+
 
     while True:
 
         while True:
 
-            if len(stack) > 1:
-                print("my stack size: {}".format(len(stack)))
+#            if len(stack) > 1:
+#                print("my stack size: {}".format(len(stack)))
 
             if 0 and hasattr(exp, 'start') and exp.start != 0:
                 l = exp.start.buffer.splitlines()
@@ -189,64 +281,25 @@ def eval1(env, exp):
                 continue
 
             if callable(exp):
-                exp = exp(eval1, env)
+                exp = op_callable(env, exp)
                 continue
 
             if isinstance(exp, Apply):
-                f = env[exp.sym.v]
-                env2 = env.copy()
-
-                try:
-                    for n, x in enumerate(f.params.v):
-                        if x.v == "&rest":
-                            p = n
-                            break
-                    else:
-                        raise ValueError()
-                    args = f.params.v[:p]
-                    argv = f.params.v[p+1]
-
-                except ValueError:
-                    args = f.params.v
-                    argv = None
-
-                if len(args) > len(exp.args):
-                    raise Exception("not enough arguments to call {}".format(f))
-
-
-                for arg, val in zip(args, exp.args):
-                    env2[arg.v] = eval1(env, val)
-
-
-                if argv is not None:
-                    agg = []
-                    for val in exp.args[len(args):]:
-                        agg.append(val)
-
-                    env2[argv.v] = EList(agg)
-
-                if isinstance(f, Closure):
-                    # why the hell this works at all?
-                    # because of no variable names conflict?
-                    env2.update(f.env)
-
-                env = env2
-                exp = f.exp
+                exp = op_apply(env, exp)
                 continue
 
 
             print(exp)
             raise Exception("Eval '{}' not implemented".format(type(exp)))
 
-        if stack == []:
-            recurs -= 1
-            return exp
+        if len(stack) == 0:
+            break
 
         frame = s_pop()
         env = frame.env
         exp = frame.cont(env, exp, frame.exp, frame.data)
 
-    recurs -= 1
+    return exp
 
 
 def get_prelude_env():
@@ -273,16 +326,15 @@ def get_prelude_env():
         if argv is not None:
             args.append(argv)
 
-        def value(evl, env):
-#            print(env)
-            fargs = list(map(lambda v: evl(env, ESym(v)), args))
+        def value(env):
+            fargs = list(map(lambda v: env[v], args))
             return tr(func(*tuple(fargs)))
 
         prelude[s] = ELambda(EList(list(map(ESym, ar))), value)
 
     _id = lambda x:x
 
-    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
+#    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
 
 #    define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.list))[0] )
 
