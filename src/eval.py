@@ -24,9 +24,8 @@ def ELambda(v, e):
 
 
 class Frame(object):
-    def __init__(self, env, exp, data, cont):
+    def __init__(self, env, data, cont):
         self.env = env
-        self.exp = exp
         self.data = data
         self.cont = cont
 
@@ -49,7 +48,7 @@ def eval2(env, exp):
     stack = deque()
 
     def s_push(cont, data):
-        stack.append(Frame(env, exp, data, cont))
+        stack.append(Frame(env, data, cont))
 
     def s_pop():
         frame = stack.pop()
@@ -246,26 +245,26 @@ def eval2(env, exp):
                 time.sleep(0.3)
 
 
-            if isinstance(exp, type((0,))):
-                exp = exp[0]
-                break
-
             if isinstance(exp, Sym):
                 exp = env[exp.v]
-
-            if isinstance(exp, If):
-                exp = op_if(env, exp)
-                continue
-
-            if isinstance(exp, Lambda):
-                exp = Closure(env.copy(), exp.params, exp.exp)
-                break
 
             if isinstance(exp, (Nil, Num, Str, Lambda, Closure)):
                 break
 
+            if isinstance(exp, Apply):
+                exp = op_apply(env, exp)
+                continue
+
             if isinstance(exp, List):
                 exp = op_list(env, exp)
+                continue
+
+            if isinstance(exp, type((0,))):
+                exp = exp[0]
+                break
+
+            if callable(exp):
+                exp = op_callable(env, exp)
                 continue
 
             if isinstance(exp, list) and exp == []:
@@ -276,18 +275,17 @@ def eval2(env, exp):
                 exp = op_pylist(env, exp)
                 continue
 
+            if isinstance(exp, If):
+                exp = op_if(env, exp)
+                continue
+
+            if isinstance(exp, Lambda):
+                exp = Closure(env.copy(), exp.params, exp.exp)
+                break
+
             if isinstance(exp, Def):
                 exp = op_def(env, exp)
                 continue
-
-            if callable(exp):
-                exp = op_callable(env, exp)
-                continue
-
-            if isinstance(exp, Apply):
-                exp = op_apply(env, exp)
-                continue
-
 
             print(exp)
             raise Exception("Eval '{}' not implemented".format(type(exp)))
@@ -297,7 +295,7 @@ def eval2(env, exp):
 
         frame = s_pop()
         env = frame.env
-        exp = frame.cont(env, exp, frame.exp, frame.data)
+        exp = frame.cont(env, exp, None, frame.data)
 
     return exp
 
