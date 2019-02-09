@@ -248,7 +248,7 @@ def eval2(env, exp):
             if isinstance(exp, Sym):
                 exp = env[exp.v]
 
-            if isinstance(exp, (Nil, Num, Str, Lambda, Closure)):
+            if isinstance(exp, (Nil, Num, Str, Closure)):
                 break
 
             if isinstance(exp, Apply):
