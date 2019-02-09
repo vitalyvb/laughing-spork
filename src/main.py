@@ -21,8 +21,12 @@ def main():
 #    print(prog.args[0].exp.exp[0].format())
 
     env = get_prelude_env()
-    x = VMEval()(env, prog)
-    print("Result = {}".format(x))
+    eval1 = VMEval()
+    try:
+        x = eval1(env, prog)
+        print("Result = {}".format(x))
+    finally:
+        eval1.stats.print()
 
 if __name__ == '__main__':
 #    import cProfile

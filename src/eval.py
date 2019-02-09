@@ -207,6 +207,13 @@ def eval2(vm, stack, env, exp):
         return cdata[len(acc)]
 
 
+    def callcc(envn):
+        res = envn["&cont"]
+        (stack0, env0) = envn["&closure"]
+        s_reset(stack0)
+        env.reset(env0)
+        return (res,)
+
     def op_apply(env, exp):
         if isinstance(exp.sym, Lambda):
             f = exp.sym
@@ -222,13 +229,8 @@ def eval2(vm, stack, env, exp):
 
                 stack0 = deque(stack)
                 env0 = env.copy()
-                def callcc(envn):
-                    res = envn["&cont"]
-                    s_reset(stack0)
-                    env.reset(env0)
-                    return (res,)
 
-                cc = ELambda(EList([ESym("&cont")]), callcc)
+                cc = Closure((stack0, env0), EList([ESym("&cont")]), callcc)
                 ret = Apply(0,0, exp.args[0], [cc]);
                 return (ret,)
 
@@ -269,6 +271,9 @@ def eval2(vm, stack, env, exp):
 #            # why the hell this works at all?
 #            # because of no variable names conflict?
 #            env.update(f.env)
+
+        if isinstance(f, Closure):
+            env["&closure"] = f.env
 
         return f.exp
 
