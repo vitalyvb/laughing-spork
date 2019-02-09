@@ -689,6 +689,32 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 500500)
 
+    def test_tail_call3(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), n])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("is-even?"), ELambda(EList([ESym("x")]),
+                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                                EList([]),
+                                Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))])))),
+
+                Def(0,0, ESym("is-odd?"), ELambda(EList([ESym("x")]),
+                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                                ENil(),
+                                Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))])))),
+
+                EList([
+                    Apply(0,0, ESym("is-even?"), [ENum(1000)]),
+                    Apply(0,0, ESym("is-even?"), [ENum(1001)]),
+                ])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertIsInstance(res, List)
+        self.assertEqual(res.v[0], EList([]))
+        self.assertIsInstance(res.v[1], Nil)
+
 
     def test_closure1(self):
         def add(s, n):
