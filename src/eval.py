@@ -218,6 +218,7 @@ def eval2(stack, env, exp):
                 print("{:3}: {}".format(ln-1, l[ln-1]))
                 print("{:3}: {}".format(ln, l[ln]))
                 print("     "+" "*cn+"^"+val)
+                print("{:3}: {}".format(ln+1, l[ln+1]))
 
 #                print(exp.start)
                 time.sleep(0.3)
@@ -376,6 +377,8 @@ def get_prelude_env():
 #    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
 
     define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.v))[0] )
+    define(_id, "display", ["&rest", "args"], lambda args: (ENil(), print(" ".join(x.v for x in args.v), end=""))[0] )
+    define(_id, "sleep", ["&rest", "args"], lambda args: (ENil(), time.sleep(0.5))[0] )
 
     define(ENum, "+", ["&rest", "args"], lambda args: reduce(lambda a,b: a+b.v, args.v, 0) )
     define(ENum, "*", ["&rest", "args"], lambda args: reduce(lambda a,b: a*b.v, args.v, 1) )
@@ -829,11 +832,11 @@ class Test_Eval(unittest.TestCase):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("yin"),
                     Apply(0,0, 
-                        ELambda(EList([ESym("cc")]), [app("debug", [Str(0,0, "@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "\n@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
 
                 Def(0,0, ESym("yang"),
                     Apply(0,0, 
-                        ELambda(EList([ESym("cc")]), [app("debug", [Str(0,0, "-")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "-")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
 
                 Apply(0,0, ESym("yin"), [ESym("yang")])
             ])
