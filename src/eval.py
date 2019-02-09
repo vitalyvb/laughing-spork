@@ -34,29 +34,110 @@ class Frame(object):
     def __repr__(self):
         return repr(self.data)
 
-recurs = 0
 
-def eval1(env, exp):
-    global recurs
-    recurs += 1
+class Stats(object):
+    def __init__(self):
+        self.clear()
 
-#    print("eval1 recursion level: {}".format(recurs))
-    stack = deque()
+    def clear(self):
+        self._max_recurs = 0
+        self._max_stack = 0
 
-    try:
-        return eval2(stack,env, exp)
-    except:
-#        print("====================")
-#        while stack:
-#            frame = stack.pop()
-#            print(frame)
-#        print("====================")
-        raise
-    finally:
-        recurs -= 1
+    def recurs(self, v):
+        if v > self._max_recurs:
+            self._max_recurs = v
+
+    def stack(self, v):
+        if v > self._max_stack:
+            self._max_stack = v
+
+    def print(self):
+        print("---------------")
+        print("VM stats:")
+        print("    Max Python recursion:{}".format(self._max_recurs))
+        print("    Max VM stack length:{}".format(self._max_stack))
 
 
-def eval2(stack, env, exp):
+class VMEval(object):
+
+
+    def __init__(self, trace=0):
+        self.trace_size = trace
+        self.stats = Stats()
+        self.clear()
+
+    def clear(self):
+        self.stats.clear()
+        self.traces = deque(maxlen=self.trace_size)
+        self.recurs = 0
+
+    def add_trace_point(self, exp, env):
+
+        if self.trace_size <= 0:
+            return
+
+        if hasattr(exp, 'start') and exp.start != 0:
+                l = exp.start.buffer.splitlines()
+                ln = exp.start.line
+                cn = exp.start.column
+
+                if isinstance(exp, Sym) and exp.v in env and isinstance(env[exp.v], (Num,Str)):
+                    val = "--  {} = {}".format(exp.v, env[exp.v].v)
+                else:
+                    val = ""
+
+                txt = []
+                if ln-1 >= 0:
+                    txt.append("{:3}: {}".format(ln-1, l[ln-1]))
+                txt.append("{:3}: {}".format(ln, l[ln]))
+                txt.append("     "+" "*cn+"^"+val)
+                if ln+1 < len(l):
+                    txt.append("{:3}: {}".format(ln+1, l[ln+1]))
+
+                self.traces.append(txt)
+#                print(len(self.traces))
+#                print(exp.start)
+#                time.sleep(0.3)
+        else:
+            self.traces.append([str(exp)])
+
+    def dump_trace(self):
+        pos = len(self.traces)
+        print("Dumping trace:")
+        while self.traces:
+            print("    {}:".format(pos))
+            txt = self.traces.popleft()
+            print("\n".join("        "+l for l in txt))
+            pos -= 1
+
+    def __call__(self, env, exp):
+        self.recurs += 1
+
+        self.stats.recurs(self.recurs)
+
+        if self.recurs > 5:
+            print("eval1 recursion level: {}".format(self.recurs))
+
+        stack = deque()
+
+        try:
+            return eval2(self, stack, env, exp)
+        except:
+
+            if self.trace_size > 0:
+                self.dump_trace()
+#            print("====================")
+#            while stack:
+#                frame = stack.pop()
+#                print(frame)
+#            print("====================")
+            raise
+        finally:
+            self.recurs -= 1
+
+eval1 = VMEval(trace=10)
+
+def eval2(vm, stack, env, exp):
 
 
     def s_push(env, cont, data):
@@ -203,25 +284,9 @@ def eval2(stack, env, exp):
 
             if len(stack) > 10:
                 print("my stack size: {}".format(len(stack)))
+            vm.stats.stack(len(stack))
 
-            if 0 and hasattr(exp, 'start') and exp.start != 0:
-                l = exp.start.buffer.splitlines()
-                ln = exp.start.line
-                cn = exp.start.column
-
-                if isinstance(exp, Sym) and exp.v in env and isinstance(env[exp.v], (Num,Str)):
-                    val = "--  {} = {}".format(exp.v, env[exp.v].v)
-                else:
-                    val = ""
-
-                print("{:3}: {}".format(ln-2, l[ln-2]))
-                print("{:3}: {}".format(ln-1, l[ln-1]))
-                print("{:3}: {}".format(ln, l[ln]))
-                print("     "+" "*cn+"^"+val)
-                print("{:3}: {}".format(ln+1, l[ln+1]))
-
-#                print(exp.start)
-                time.sleep(0.3)
+            vm.add_trace_point(exp, env)
 
 
             if isinstance(exp, Sym):
@@ -399,8 +464,11 @@ class Test_Eval(unittest.TestCase):
     def setUp(self):
         self.env = get_prelude_env()
 
+    @classmethod
+    def tearDownClass(cls):
+        eval1.stats.print()
 
-    def test_unhandled1(self):
+    def test_unhandled1_raises(self):
         class _Unhandled(object):
             pass
         p = _Unhandled()
@@ -466,7 +534,7 @@ class Test_Eval(unittest.TestCase):
         self.assertEqual(res, 19)
 
 
-    def test_sub1(self):
+    def test_sub1_raises(self):
         p = Apply(0,0, ESym("-"), [])
         with self.assertRaises(Exception):
             res = eval1(self.env, p)
@@ -482,7 +550,7 @@ class Test_Eval(unittest.TestCase):
         self.assertEqual(res, -13)
 
 
-    def test_div1(self):
+    def test_div1_raises(self):
         p = Apply(0,0, ESym("/"), [])
         with self.assertRaises(Exception):
             res = eval1(self.env, p)
@@ -502,18 +570,18 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 0)
 
-    def test_div5(self):
+    def test_div5_raises(self):
         p = Apply(0,0, ESym("/"), [ENum(1), ENum(0)])
         with self.assertRaises(EvalRuntimeError):
             eval1(self.env, p)
 
 
-    def test_eq1(self):
+    def test_eq1_raises(self):
         p = Apply(0,0, ESym("="), [])
         with self.assertRaises(Exception):
             eval1(self.env, p)
 
-    def test_eq2(self):
+    def test_eq2_raises(self):
         p = Apply(0,0, ESym("="), [ENum(44)])
         with self.assertRaises(Exception):
             eval1(self.env, p)
@@ -569,7 +637,7 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 33)
 
-    def test_lambda3(self):
+    def test_lambda3_raises(self):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("x")]), ESym("x"))),
                 Apply(0,0, ESym("f"), [])
@@ -578,7 +646,7 @@ class Test_Eval(unittest.TestCase):
         with self.assertRaises(Exception):
             eval1(self.env, p)
 
-    def test_lambda4(self):
+    def test_lambda4_raises(self):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("x")]), ESym("x"))),
                 Apply(0,0, ESym("f"), [ENum(33), ENum(44)])
@@ -607,7 +675,7 @@ class Test_Eval(unittest.TestCase):
         self.assertIsInstance(res, List)
         self.assertEqual(res.v, [])
 
-    def test_lambda7(self):
+    def test_lambda7_raises(self):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("x"), ESym("&rest"), ESym("xs"),]), ESym("xs"))),
                 Apply(0,0, ESym("f"), [])
@@ -849,7 +917,7 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, EList([4, 2]))
 
-    def test_callcc_yin_yang(self):
+    def test_callcc_yin_yang_raises(self):
         def app(f, n):
             return Apply(0,0, ESym(f), [n])
 

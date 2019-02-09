@@ -2,7 +2,7 @@
 
 import sys
 from parse import parse_to_ast, ParseError
-from eval import get_prelude_env, eval1
+from eval import get_prelude_env, VMEval
 
 def main():
     if len(sys.argv) < 2:
@@ -21,7 +21,7 @@ def main():
 #    print(prog.args[0].exp.exp[0].format())
 
     env = get_prelude_env()
-    x = eval1(env, prog)
+    x = VMEval()(env, prog)
     print("Result = {}".format(x))
 
 if __name__ == '__main__':
