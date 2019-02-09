@@ -30,7 +30,7 @@ class Token(object):
         raise Exception()
 
     def __eq__(self, other):
-        raise Exception()
+        raise Exception("can't compare {} with {}".format(self.__class__.__name__, other))
 
 
 class Nil(Token):

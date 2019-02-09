@@ -62,6 +62,11 @@ def eval2(stack, env, exp):
     def s_push(env, cont, data):
         stack.append(Frame(env, data, cont))
 
+    def s_reset(st):
+        while stack:
+            stack.pop()
+        stack.extend(st)
+
     def s_pop():
         frame = stack.pop()
         return frame
@@ -96,7 +101,7 @@ def eval2(stack, env, exp):
 
     def op_list2(env, exp, _cexp, cdata):
         cdata, acc = cdata
-        acc.append(exp)
+        acc = acc + [exp]
 
         if len(acc) >= len(cdata.v):
             return (EList(acc),)
@@ -112,7 +117,7 @@ def eval2(stack, env, exp):
 
     def op_pylist2(env, exp, _cexp, cdata):
         cdata, acc = cdata
-        acc.append(exp)
+        acc = acc + [exp]
 
         if len(acc) >= len(cdata)-1:
             return cdata[len(acc)]
@@ -122,23 +127,31 @@ def eval2(stack, env, exp):
 
 
     def op_apply(env, exp):
-        if exp.sym.v == "begin":
-            return exp.args
+        if isinstance(exp.sym, Lambda):
+            f = exp.sym
+        else:
+            if exp.sym.v == "begin":
+                return exp.args
 
-        if exp.sym.v == "call/cc":
-            f = env[exp.args[0].v]
+            if exp.sym.v == "call/cc":
+                if isinstance(exp.args[0], Lambda):
+                    f = exp.args[0]
+                else:
+                    f = env[exp.args[0].v]
 
-            exp0 = exp
-            def callcc(envn):
-                s_pop()
-                return ESym("&cont")
+                stack0 = deque(stack)
+                env0 = env.copy()
+                def callcc(envn):
+                    res = envn["&cont"]
+                    s_reset(stack0)
+                    env.reset(env0)
+                    return (res,)
 
-            cc = ELambda(EList([ESym("&cont")]), callcc)
-            ret = Apply(0,0, exp.args[0], [cc]);
-            return ret
+                cc = ELambda(EList([ESym("&cont")]), callcc)
+                ret = Apply(0,0, exp.args[0], [cc]);
+                return (ret,)
 
-
-        f = env[exp.sym.v]
+            f = env[exp.sym.v]
 
         for n, x in enumerate(f.params.v):
             if x.v == "&rest":
@@ -185,6 +198,8 @@ def eval2(stack, env, exp):
     while True:
 
         while True:
+
+#            print(exp)
 
             if len(stack) > 10:
                 print("my stack size: {}".format(len(stack)))
@@ -276,12 +291,24 @@ class Env(object):
             for k in local:
                 self._locals[k] = None
 
-    def copy(self, local=None):
-        print(local)
-        return Env(prev=self, local=local)
+#    def copy(self, local=None):
+#        print(local)
+#        return Env(prev=self, local=local)
+
+    def copy(self):
+        e = Env()
+        e._globals = self._globals.copy()
+        e._locals = self._locals.copy()
+        e._prev_env = self._prev_env.copy() if self._prev_env is not None else None
+        return e
 
     def _init(self):
         self._globals["&rest"] = type("Rest", (object,), {})
+
+    def reset(self, other):
+        self._globals = other._globals
+        self._locals = other._locals
+        self._prev_env = other._prev_env
 
     def search(self, s, default=None):
         # search in all locals, then globals
@@ -348,7 +375,7 @@ def get_prelude_env():
 
 #    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
 
-#    define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.list))[0] )
+    define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.v))[0] )
 
     define(ENum, "+", ["&rest", "args"], lambda args: reduce(lambda a,b: a+b.v, args.v, 0) )
     define(ENum, "*", ["&rest", "args"], lambda args: reduce(lambda a,b: a*b.v, args.v, 1) )
@@ -782,9 +809,6 @@ class Test_Eval(unittest.TestCase):
         self.assertEqual(res, EList([33, 3]))
 
     def test_callcc1(self):
-        def add(s, n):
-            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
-
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("return")]), [ Apply(0,0, ESym("return"), [ENum(2)]), ENum(4) ])),
 
@@ -796,6 +820,27 @@ class Test_Eval(unittest.TestCase):
 
         res = eval1(self.env, p)
         self.assertEqual(res, EList([4, 2]))
+
+    @unittest.skip
+    def test_callcc_yin_yang(self):
+        def app(f, n):
+            return Apply(0,0, ESym(f), [n])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("yin"),
+                    Apply(0,0, 
+                        ELambda(EList([ESym("cc")]), [app("debug", [Str(0,0, "@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+
+                Def(0,0, ESym("yang"),
+                    Apply(0,0, 
+                        ELambda(EList([ESym("cc")]), [app("debug", [Str(0,0, "-")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+
+                Apply(0,0, ESym("yin"), [ESym("yang")])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([4, 2]))
+
 
 if __name__ == "__main__":
     unittest.main()
