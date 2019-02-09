@@ -337,6 +337,10 @@ class Env(object):
         else:
             raise Exception("symbol '{}' not defined".format(s))
 
+    def __contains__(self, i):
+        d = self.search(i)
+        return d is not None and i in d
+
     def __getitem__(self, i):
         return self.get(i)
 
