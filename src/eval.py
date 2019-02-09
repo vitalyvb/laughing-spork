@@ -22,6 +22,8 @@ def EList(v):
 def ELambda(v, e):
     return Lambda(0, 0, v, e)
 
+class EvalRuntimeError(Exception):
+    pass
 
 class Frame(object):
     def __init__(self, env, data, cont):
@@ -47,7 +49,7 @@ def eval2(env, exp):
 
     stack = deque()
 
-    def s_push(cont, data):
+    def s_push(env, cont, data):
         stack.append(Frame(env, data, cont))
 
     def s_pop():
@@ -55,16 +57,8 @@ def eval2(env, exp):
         return frame
 
 
-#    def op_if(env, exp):
-#        v = eval1(env, exp.exp)
-#        if not isinstance(v, Nil):
-#            exp = exp.thn
-#        else:
-#            exp = exp.els
-#        return exp
-
     def op_if(env, exp):
-        s_push(op_if2, exp)
+        s_push(env, op_if2, exp)
         return exp.exp
 
     def op_if2(env, exp, _cexp, cdata):
@@ -75,12 +69,8 @@ def eval2(env, exp):
         return exp
 
 
-#    def op_def(env, exp):
-#        env[exp.sym.v] = eval1(env, exp.exp)
-#        return ENil()
-
     def op_def(env, exp):
-        s_push(op_def2, exp)
+        s_push(env, op_def2, exp)
         return exp.exp
 
     def op_def2(env, exp, _cexp, cdata):
@@ -88,18 +78,10 @@ def eval2(env, exp):
         return ENil()
 
 
-#    def op_list(env, exp):
-#        r = []
-#        env2 = env.copy()
-#        for i in exp.v:
-#            r.append(eval1(env2, i))
-#        return EList(r)
-
-
     def op_list(env, exp):
         if len(exp.v) == 0:
             return (exp,)
-        s_push(op_list2, (exp, []))
+        s_push(env, op_list2, (exp, []))
         return exp.v[0]
 
     def op_list2(env, exp, _cexp, cdata):
@@ -109,20 +91,13 @@ def eval2(env, exp):
         if len(acc) >= len(cdata.v):
             return (EList(acc),)
 
-        s_push(op_list2, (cdata, acc))
+        s_push(env, op_list2, (cdata, acc))
         return cdata.v[len(acc)]
 
 
-#    def op_pylist(env, exp):
-#        tail = exp[-1]
-#        for i in exp[:-1]:
-#            eval1(env, i)
-#        exp = tail
-#        return tail
-
     def op_pylist(env, exp):
         if len(exp) > 1:
-            s_push(op_pylist2, (exp, []))
+            s_push(env, op_pylist2, (exp, []))
         return exp[0]
 
     def op_pylist2(env, exp, _cexp, cdata):
@@ -132,46 +107,9 @@ def eval2(env, exp):
         if len(acc) >= len(cdata)-1:
             return cdata[len(acc)]
 
-        s_push(op_pylist2, (cdata, acc))
+        s_push(env, op_pylist2, (cdata, acc))
         return cdata[len(acc)]
 
-#    def op_apply(env, exp):
-#        f = env[exp.sym.v]
-#
-#        try:
-#            for n, x in enumerate(f.params.v):
-#                if x.v == "&rest":
-#                    p = n
-#                    break
-#            else:
-#                raise ValueError()
-#            args = f.params.v[:p]
-#            argv = f.params.v[p+1]
-#
-#        except ValueError:
-#            args = f.params.v
-#            argv = None
-#
-#        if len(args) > len(exp.args):
-#            raise Exception("not enough arguments to call {}".format(f))
-#
-#        for arg, val in zip(args, exp.args):
-#            env[arg.v] = eval1(env, val)
-#
-#        if argv is not None:
-#            agg = []
-#            for val in exp.args[len(args):]:
-#                # not evaluated, probably bug, but needed for tail call optimization for begin
-#                agg.append(val)
-#
-#            env[argv.v] = EList(agg)
-#
-#        if isinstance(f, Closure):
-#            # why the hell this works at all?
-#            # because of no variable names conflict?
-#            env.update(f.env)
-#
-#        return f.exp
 
     def op_apply(env, exp):
         if exp.sym.v == "begin":
@@ -189,14 +127,16 @@ def eval2(env, exp):
             args = f.params.v
             argv = None
 
-
         if len(args) > len(exp.args):
             raise Exception("not enough arguments to call {}".format(f))
+
+        if argv is None and len(args) < len(exp.args):
+            raise Exception("too many arguments to call {}".format(f))
 
         ctx = (f, args, argv)
         largs = exp.args
 
-        s_push(op_apply2, ctx)
+        s_push(env, op_apply2, ctx)
         return EList(largs)
 
     def op_apply2(env, exp, _cexp, cdata):
@@ -208,10 +148,10 @@ def eval2(env, exp):
         if argv is not None:
             env[argv.v] = EList(exp.v[len(args):])
 
-        if isinstance(f, Closure):
-            # why the hell this works at all?
-            # because of no variable names conflict?
-            env.update(f.env)
+#        if isinstance(f, Closure):
+#            # why the hell this works at all?
+#            # because of no variable names conflict?
+#            env.update(f.env)
 
         return f.exp
 
@@ -223,8 +163,8 @@ def eval2(env, exp):
 
         while True:
 
-#            if len(stack) > 1:
-#                print("my stack size: {}".format(len(stack)))
+            if len(stack) > 10:
+                print("my stack size: {}".format(len(stack)))
 
             if 0 and hasattr(exp, 'start') and exp.start != 0:
                 l = exp.start.buffer.splitlines()
@@ -280,14 +220,13 @@ def eval2(env, exp):
                 continue
 
             if isinstance(exp, Lambda):
-                exp = Closure(env.copy(), exp.params, exp.exp)
+#                exp = Closure(env.copy(), exp.params, exp.exp)
                 break
 
             if isinstance(exp, Def):
                 exp = op_def(env, exp)
                 continue
 
-            print(exp)
             raise Exception("Eval '{}' not implemented".format(type(exp)))
 
         if len(stack) == 0:
@@ -300,10 +239,62 @@ def eval2(env, exp):
     return exp
 
 
+class Env(object):
+    def __init__(self, prev=None, local=None):
+        self._prev_env = prev
+        if prev is None:
+            self._globals = {}
+            self._init()
+        else:
+            self._globals = prev._globals
+
+        self._locals = {}
+        if local is not None:
+            for k in local:
+                self._locals[k] = None
+
+    def copy(self, local=None):
+        print(local)
+        return Env(prev=self, local=local)
+
+    def _init(self):
+        self._globals["&rest"] = type("Rest", (object,), {})
+
+    def search(self, s, default=None):
+        # search in all locals, then globals
+        if s in self._locals:
+            # this locals
+            return self._locals
+
+        if self._prev_env is not None:
+            # prev env's locals, or globals if none
+            return self._prev_env.search(s, default)
+
+        if s in self._globals:
+            return self._globals
+
+        return default
+
+    def set(self, s, v):
+        d = self.search(s, self._globals)
+        d[s] = v
+
+    def get(self, s):
+        d = self.search(s)
+        if d is not None:
+            return d[s]
+        else:
+            raise Exception("symbol '{}' not defined".format(s))
+
+    def __getitem__(self, i):
+        return self.get(i)
+
+    def __setitem__(self, i, v):
+        return self.set(i, v)
+
+
 def get_prelude_env():
-    prelude = {
-        "&rest": type("Rest", (object,), {}),
-    }
+    new_env = Env()
 
     def define(tr, s, ar, func):
         args = []
@@ -328,7 +319,7 @@ def get_prelude_env():
             fargs = list(map(lambda v: env[v], args))
             return tr(func(*tuple(fargs)))
 
-        prelude[s] = ELambda(EList(list(map(ESym, ar))), value)
+        new_env[s] = ELambda(EList(list(map(ESym, ar))), value)
 
     _id = lambda x:x
 
@@ -339,11 +330,16 @@ def get_prelude_env():
     define(ENum, "+", ["&rest", "args"], lambda args: reduce(lambda a,b: a+b.v, args.v, 0) )
     define(ENum, "*", ["&rest", "args"], lambda args: reduce(lambda a,b: a*b.v, args.v, 1) )
     define(ENum, "-", ["i", "&rest", "args"], lambda i, args: reduce(lambda a,b: a-b.v, args.v, i.v) )
-    define(ENum, "/", ["i", "&rest", "args"], lambda i, args: reduce(lambda a,b: a//b.v, args.v, i.v) )
+
+    def unzero(n):
+        if n == 0:
+            raise EvalRuntimeError("division by zero")
+        return n
+    define(ENum, "/", ["i", "&rest", "args"], lambda i, args: reduce(lambda a,b: a//unzero(b.v), args.v, i.v) )
 
     define(_id, "=", ["a", "b"], lambda a, b: [ENil(), EList([])][a.v == b.v] )
 
-    return prelude
+    return new_env
 
 
 class Test_Eval(unittest.TestCase):
@@ -454,7 +450,6 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 0)
 
-    @unittest.skip("not implemented")
     def test_div5(self):
         p = Apply(0,0, ESym("/"), [ENum(1), ENum(0)])
         with self.assertRaises(EvalRuntimeError):
@@ -531,7 +526,6 @@ class Test_Eval(unittest.TestCase):
         with self.assertRaises(Exception):
             eval1(self.env, p)
 
-    @unittest.skip("bug")
     def test_lambda4(self):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("x")]), ESym("x"))),
@@ -663,7 +657,7 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 22)
 
-    @unittest.skip("bug")
+#    @unittest.skip("bug")
     def test_closure2(self):
         def add(s, n):
             return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
@@ -686,6 +680,81 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 22)
 
+    def test_scope_dyn1(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("a"), ENum(12)),
+                Def(0,0, ESym("f"), ELambda(EList([]), add("a", 3))),
+                Def(0,0, ESym("a"), ENum(42)),
+
+                Apply(0,0, ESym("f"), []),
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 45)
+
+    def test_scope_dyn2(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("a"), ENum(12)),
+                Def(0,0, ESym("f"), ELambda(EList([]), add("a", 3))),
+                Def(0,0, ESym("r"), Apply(0,0, ESym("f"), [])),
+                Def(0,0, ESym("a"), ENum(42)),
+
+                ESym("r"),
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 15)
+
+    def test_scope_dyn3(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("a"), ENum(42)),
+                Def(0,0, ESym("f"), ELambda(EList([ESym("a")]), [Def(0,0, ESym("a"), ENum(3)), ESym("a")])),
+                Def(0,0, ESym("r"), Apply(0,0, ESym("f"), [ENum(33)])),
+
+                EList([ESym("r"), ESym("a")])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([3, 42]))
+
+    def test_scope_dyn3a(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("a"), ENum(42)),
+                Def(0,0, ESym("f"), ELambda(EList([ESym("a")]), ESym("a"))),
+                Def(0,0, ESym("r"), Apply(0,0, ESym("f"), [ENum(33)])),
+
+                EList([ESym("r"), ESym("a")])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([33, 42]))
+
+    def test_scope_dyn4(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("a"), ENum(42)),
+                Def(0,0, ESym("f"), ELambda(EList([ESym("b")]), [Def(0,0, ESym("a"), ENum(3)), ESym("b")])),
+                Def(0,0, ESym("r"), Apply(0,0, ESym("f"), [ENum(33)])),
+
+                EList([ESym("r"), ESym("a")])
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([33, 3]))
 
 if __name__ == "__main__":
     unittest.main()
