@@ -347,11 +347,7 @@ class Env(object):
     def __setitem__(self, i, v):
         return self.set(i, v)
 
-
-def get_prelude_env():
-    new_env = Env()
-
-    def define(tr, s, ar, func):
+    def add_builtin(self, tr, s, ar, func):
         args = []
         argv = None
         for i, v in enumerate(ar):
@@ -362,11 +358,6 @@ def get_prelude_env():
         if v == "&rest":
             argv = ar[i+1]
 
-#        print(s)
-#        print(args)
-#        print(argv)
-#        print(".")
-
         if argv is not None:
             args.append(argv)
 
@@ -374,11 +365,15 @@ def get_prelude_env():
             fargs = list(map(lambda v: env[v], args))
             return tr(func(*tuple(fargs)))
 
-        new_env[s] = ELambda(EList(list(map(ESym, ar))), value)
+        self._globals[s] = ELambda(EList(list(map(ESym, ar))), value)
+
+
+def get_prelude_env():
+    new_env = Env()
+
+    define = new_env.add_builtin
 
     _id = lambda x:x
-
-#    prelude["begin"] = ELambda(EList(list(map(ESym, ["&rest", "args"]))), lambda evl, env: env["args"].v)
 
     define(_id, "debug", ["&rest", "args"], lambda args: (ENil(), print(args.v))[0] )
     define(_id, "display", ["&rest", "args"], lambda args: (ENil(), print(" ".join(x.v for x in args.v), end=""))[0] )
@@ -828,15 +823,33 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, EList([4, 2]))
 
-    @unittest.skip
     def test_callcc_yin_yang(self):
         def app(f, n):
             return Apply(0,0, ESym(f), [n])
 
+        class _MyAbort(Exception):
+            pass
+
+        def display(args):
+
+            display.res += args.v[0].v
+
+            display.cnt += 1
+            if display.cnt > 26:
+                raise _MyAbort()
+
+            return ENil()
+
+        display.cnt = 0
+        display.res = ""
+
+        self.env.add_builtin(lambda x:x, "display", ["&rest", "args"], display )
+
+
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("yin"),
                     Apply(0,0, 
-                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "\n@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
 
                 Def(0,0, ESym("yang"),
                     Apply(0,0, 
@@ -845,8 +858,10 @@ class Test_Eval(unittest.TestCase):
                 Apply(0,0, ESym("yin"), [ESym("yang")])
             ])
 
-        res = eval1(self.env, p)
-        self.assertEqual(res, EList([4, 2]))
+        with self.assertRaises(_MyAbort):
+            eval1(self.env, p)
+
+        self.assertEqual(display.res, "@-@--@---@----@-----@------")
 
 
 if __name__ == "__main__":
