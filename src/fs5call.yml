@@ -1,0 +1,29 @@
+---
+- begin
+
+- - define
+  - apply
+  - - lambda
+    - [f, txt, args1]
+    - - debug
+      - txt
+    - - call
+      - f
+      - args1
+  
+
+- - define
+  - test
+  - - apply
+    - - lambda
+      - - x
+      - - debug
+        - x
+      - - '+'
+        - x
+        - 10
+    - "hi there"
+    - 3
+
+- test
+
