@@ -1,0 +1,33 @@
+---
+- begin
+
+- - define
+  - yin
+  - - call
+    - - lambda
+      - - cc
+      - - display
+        - "\n@"
+      - - sleep
+      - cc
+    - - - call/cc
+        - - lambda
+          - - x
+          - x
+
+- - define
+  - yang
+  - - call
+    - - lambda
+      - - cc
+      - - display
+        - "-"
+      - cc
+    - - - call/cc
+        - - lambda
+          - - x
+          - x
+
+- - yin
+  - yang
+
