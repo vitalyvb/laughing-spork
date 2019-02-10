@@ -75,6 +75,28 @@ def comp_to_ast(comp):
     def ast_apply(s, e, fst, items):
         return Apply(s, e, fst, items)
 
+    def ast_call(s, e, items):
+        l = len(items)
+        if l != 2:
+            print(s, end='')
+            print("-- 'call' requires 2 arguments: [what [args]], but has {}".format(l))
+            print(e, end='')
+            print("-- unexpected item")
+            raise ParseError()
+        what = items[0]
+        args = items[1]
+
+        if not isinstance(args, (List, Sym)):
+            print(args.start, end='')
+            print("-- second argument of 'call' must be a list or a symbol: but got {}".format(args))
+            raise ParseError()
+
+        if isinstance(args, List):
+            args = args.v
+        else:
+            args = args
+        print(what, args)
+        return ast_apply(s, e, what, args)
 
     def seq2ast(s, e, items):
         if len(items) > 0:
@@ -87,6 +109,8 @@ def comp_to_ast(comp):
                     return ast_if(s, e, list(other))
                 if fst.v == "lambda":
                     return ast_lambda(s, e, items[1:])
+                if fst.v == "call":
+                    return ast_call(s, e, list(other))
                 return ast_apply(s, e, Sym.derive(fst, fst.v), list(other))
 
         return List(s, e, list(map(astize, items)))

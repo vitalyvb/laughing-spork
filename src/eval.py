@@ -246,20 +246,26 @@ def eval2(vm, stack, env, exp):
             args = f.params.v
             argv = None
 
-        if len(args) > len(exp.args):
-            raise Exception("not enough arguments to call {}".format(f))
-
-        if argv is None and len(args) < len(exp.args):
-            raise Exception("too many arguments to call {}".format(f))
-
         ctx = (f, args, argv)
         largs = exp.args
 
         s_push(env, op_apply2, ctx)
-        return EList(largs)
+        if isinstance(largs, list):
+            return EList(largs)
+
+        if isinstance(largs, Sym):
+            return EList([largs])
+
+        raise Exception("unexpected arguments type '{}' when calling '{}'".format(largs, exp.sym.v))
 
     def op_apply2(env, exp, _cexp, cdata):
         (f, args, argv) = cdata
+
+        if len(args) > len(exp.v):
+            raise Exception("not enough arguments to call {}".format(f))
+
+        if argv is None and len(args) < len(exp.v):
+            raise Exception("too many arguments to call {}".format(f))
 
         for arg, val in zip(args, exp.v):
             env[arg.v] = val

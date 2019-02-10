@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from functools import reduce
 from collections import namedtuple
 
 class Token(object):
@@ -83,6 +84,10 @@ def relist(exp):
         e = 0
 
     return List(s, e, exp, style=("[", "]"))
+
+def tag(s, t):
+    # tag('    xc v 4', '*') -> '    *xc v 4'
+    return reduce(lambda a_c, b: (a_c[0]+a_c[1]+b, ' ') if b != '' else (a_c[0]+' ', a_c[1]), s.split(' '), ("", t))[0]
 
 class List(_Value):
     def __init__(self, *a, style=("","."), **kw):
@@ -196,7 +201,10 @@ class Apply(Token):
 
         r = []
         r.append(self._sym.format(align)+"(")
-        r.extend(x.format(align2) for x in self._args)
+        if isinstance(self._args, list):
+            r.extend(x.format(align2) for x in self._args)
+        else:
+            r.append(tag(self._args.format(align2), "*"))
         r.append(align(")"))
 
         return "\n".join(r)
