@@ -4,7 +4,7 @@
   - fac'
   - - lambda
     - [ x, acc ]
-    - [ if, [ '=', x, 1 ], acc, [ fac', ['-',  x, 1 ], [ '*', acc, x ] ]]
+    - [ if, [ 'eq?', x, 1 ], acc, [ fac', ['-',  x, 1 ], [ '*', acc, x ] ]]
 
 - - define
   - fac

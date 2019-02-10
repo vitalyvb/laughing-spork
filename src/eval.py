@@ -465,7 +465,7 @@ def get_prelude_env():
         return n
     define(ENum, "/", ["i", "&rest", "args"], lambda i, args: reduce(lambda a,b: a//unzero(b.v), args.v, i.v) )
 
-    define(_id, "=", ["a", "b"], lambda a, b: [ENil(), EList([])][a.v == b.v] )
+    define(_id, "eq?", ["a", "b"], lambda a, b: [ENil(), EList([])][a.v == b.v] )
 
     return new_env
 
@@ -588,22 +588,22 @@ class Test_Eval(unittest.TestCase):
 
 
     def test_eq1_raises(self):
-        p = Apply(0,0, ESym("="), [])
+        p = Apply(0,0, ESym("eq?"), [])
         with self.assertRaises(Exception):
             eval1(self.env, p)
 
     def test_eq2_raises(self):
-        p = Apply(0,0, ESym("="), [ENum(44)])
+        p = Apply(0,0, ESym("eq?"), [ENum(44)])
         with self.assertRaises(Exception):
             eval1(self.env, p)
 
     def test_eq3(self):
-        p = Apply(0,0, ESym("="), [ENum(3), ENum(5)])
+        p = Apply(0,0, ESym("eq?"), [ENum(3), ENum(5)])
         res = eval1(self.env, p)
         self.assertIsInstance(res, Nil)
 
     def test_eq4(self):
-        p = Apply(0,0, ESym("="), [ENum(3), ENum(3)])
+        p = Apply(0,0, ESym("eq?"), [ENum(3), ENum(3)])
         res = eval1(self.env, p)
         self.assertNotIsInstance(res, Nil)
 
@@ -739,7 +739,7 @@ class Test_Eval(unittest.TestCase):
 
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("acc"), ESym("x")]),
-                    If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                    If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                             ESym("acc"),
                             Apply(0,0, ESym("f"), [add("acc", ESym("x")),
                                                    add("x", ENum(-1))])
@@ -757,7 +757,7 @@ class Test_Eval(unittest.TestCase):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("f"), ELambda(EList([ESym("acc"), ESym("x")]),
                     Apply(0,0, ESym("begin"), [
-                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                        If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 ESym("acc"),
                                 Apply(0,0, ESym("f"), [add("acc", ESym("x")),
                                                    add("x", ENum(-1))]))
@@ -774,12 +774,12 @@ class Test_Eval(unittest.TestCase):
 
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("is-even?"), ELambda(EList([ESym("x")]),
-                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                        If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 EList([]),
                                 Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))])))),
 
                 Def(0,0, ESym("is-odd?"), ELambda(EList([ESym("x")]),
-                        If(0,0, Apply(0,0, ESym("="), [ESym("x"), ENum(0)]),
+                        If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 ENil(),
                                 Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))])))),
 
