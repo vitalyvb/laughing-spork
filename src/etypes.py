@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from collections import namedtuple
-from collections.abc import Iterable
 
 class Token(object):
     def __init__(self, start, end):
@@ -72,8 +71,24 @@ class Sym(_Value):
 class Str(_Value):
     pass
 
+def relist(exp):
+    if not isinstance(exp, list):
+        return exp
+
+    if len(exp) > 1:
+        s = exp[0].start
+        e = exp[-1].end
+    else:
+        s = 0
+        e = 0
+
+    return List(s, e, exp, style=("[", "]"))
 
 class List(_Value):
+    def __init__(self, *a, style=("","."), **kw):
+        super(List, self).__init__(*a, **kw)
+        self._style = style
+
     def format(self, align=lambda x:x):
         if self._v == []:
             return align("[]")
@@ -82,8 +97,9 @@ class List(_Value):
             return "    " + align(x)
 
         r = []
+        r.append(align2(self._style[0]))
         r.extend(x.format(align2) for x in self._v)
-        r.append(align2("."))
+        r.append(align2(self._style[1]))
 
         return "\n".join(r)
 
@@ -114,7 +130,7 @@ class Def(Token):
         r = []
         r.append(self._sym.format(align))
         r.append(align(":="))
-        r.append(self._exp.format(align2))
+        r.append(relist(self._exp).format(align2))
 
         return "\n".join(r)
 
@@ -213,10 +229,7 @@ class Lambda(Token):
         r = []
         r.append(align("λ ") + repr(self._params.v))
         r.append(align(":="))
-        if isinstance(self._exp, Iterable):
-            r.extend(x.format(align2) for x in self._exp)
-        else:
-            r.append(self._exp.format(align2))
+        r.append(relist(self._exp).format(align2))
         r.append(align("."))
 
         return "\n".join(r)

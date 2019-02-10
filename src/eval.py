@@ -211,7 +211,7 @@ def eval2(vm, stack, env, exp):
         res = envn["&cont"]
         (stack0, env0) = envn["&closure"]
         s_reset(stack0)
-        env.reset(env0)
+        envn.reset(env0)
         return (res,)
 
     def op_apply(env, exp):

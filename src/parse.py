@@ -15,14 +15,11 @@ def comp_to_ast(comp):
 
     def ast_define(s, e, items):
         l = len(items)
-        if l != 2:
+        if l < 2:
             print(s, end='')
-            print("-- 'define' requires 2 arguments, but has {}".format(l))
+            print("-- 'define' requires 2 arguments or more, but has {}".format(l))
             if l < 2:
                 print(e, end='')
-                print("-- unexpected item")
-            else:
-                print(items[2].start, end='')
                 print("-- unexpected item")
             raise ParseError()
         sym = items[0]
@@ -30,7 +27,7 @@ def comp_to_ast(comp):
             print(sym.start, end='')
             print("-- first 'define' parameter must be a symbol")
             raise ParseError()
-        return Def(s, e, sym, items[1])
+        return Def(s, e, sym, items[1:])
 
     def ast_if(s, e, items):
         l = len(items)
