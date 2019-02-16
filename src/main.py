@@ -21,7 +21,7 @@ def main():
 #    print(prog.args[0].exp.exp[0].format())
 
     env = get_prelude_env()
-    eval1 = VMEval()
+    eval1 = VMEval(trace=10)
     try:
         x = eval1(env, prog)
         print("Result = {}".format(x))
