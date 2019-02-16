@@ -1,0 +1,79 @@
+---
+- begin
+
+- - define
+  - iter
+  - - lambda
+    - [ from, to, f ]
+    - - if
+      - - eq?
+        - from
+        - to
+      - - f
+        - from
+      - - begin
+        - - f
+          - from
+        - - iter
+          - - '+'
+            - from
+            - 1
+          - to
+          - f
+
+- - define
+  - make-gen
+  - - lambda
+    - [from, to]
+    - - define
+      - control-state
+
+      - - lambda
+        - [return]
+        - - iter
+          - from
+          - to
+
+          - - lambda
+            - [ element ]
+            - - define
+              - return
+              - - begin
+                - - call/cc
+
+                  - - lambda
+                    - [resume-here]
+                    - - define
+                      - control-state
+                      - resume-here
+                    - - return
+                      - element
+
+        - - return
+          - "end"
+
+    - - define
+      - generator
+      - - lambda
+        - []
+        - - call/cc
+          - control-state
+
+    - generator
+
+
+- - define
+  - gen
+  - - make-gen
+    - 0
+    - 2
+
+- - debug
+  - - gen
+- - debug
+  - - gen
+- - debug
+  - - gen
+- - debug
+  - - gen
+

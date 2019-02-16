@@ -104,7 +104,7 @@ class VMEval(object):
                     txt.append("{:3}: {}".format(ln+1, l[ln+1]))
 
                 self.traces.append(txt)
-#                print(len(self.traces))
+
 #                print(exp.start)
 #                time.sleep(0.3)
         else:
@@ -130,6 +130,15 @@ class VMEval(object):
         stack = deque()
 
         try:
+            if isinstance(exp, list):
+                res = []
+                for e in exp:
+                    v = eval2(self, stack, env.copy(), e)
+                    if not isinstance(v, Nil):
+                        res.append(v)
+#                    print("#######################", v)
+                return res
+
             return eval2(self, stack, env, exp)
         except:
 
@@ -147,7 +156,6 @@ class VMEval(object):
 eval1 = VMEval(trace=10)
 
 def eval2(vm, stack, env, exp):
-
 
     def s_push(env, cont, data):
         stack.append(Frame(env, data, cont))
@@ -179,7 +187,7 @@ def eval2(vm, stack, env, exp):
         return exp.exp
 
     def op_def2(env, exp, _cexp, cdata):
-        env[cdata.sym.v] = exp
+        env.set(cdata.sym.v, exp, is_global=cdata._is_global)
         return ENil()
 
 
@@ -192,7 +200,6 @@ def eval2(vm, stack, env, exp):
     def op_list2(env, exp, _cexp, cdata):
         cdata, acc = cdata
         acc = acc + [exp]
-
         if len(acc) >= len(cdata.v):
             return (EList(acc),)
 
@@ -215,12 +222,13 @@ def eval2(vm, stack, env, exp):
         s_push(env, op_pylist2, (cdata, acc))
         return cdata[len(acc)]
 
-
     def callcc(envn):
         res = envn["&cont"]
         (stack0, env0) = envn["&closure"]
+
         s_reset(stack0)
-        envn.reset(env0)
+# XXX        envn.reset(env0)
+
         return (res,)
 
     def op_apply(env, exp):
@@ -241,7 +249,7 @@ def eval2(vm, stack, env, exp):
             cc = Closure((stack0, env0), EList([ESym("&cont")]), callcc)
             # whatever cdata.args[0] is, Apply will evaluate it
             ret = Apply(0,0, cdata.args[0], [cc]);
-            return (ret,)
+            return ret
 
         for n, x in enumerate(f.params.v):
             if x.v == "&rest":
@@ -300,8 +308,11 @@ def eval2(vm, stack, env, exp):
 
 #            print(exp)
 
-            if len(stack) > 10:
+            if len(stack) > 20:
                 print("my stack size: {}".format(len(stack)))
+                for x in stack:
+                    print(x)
+                1/0
             vm.stats.stack(len(stack))
 
             vm.add_trace_point(exp, env)
@@ -376,12 +387,11 @@ class Env(object):
                 self._locals[k] = None
 
 #    def copy(self, local=None):
-#        print(local)
 #        return Env(prev=self, local=local)
 
     def copy(self):
         e = Env()
-        e._globals = self._globals.copy()
+        e._globals = self._globals
         e._locals = self._locals.copy()
         e._prev_env = self._prev_env.copy() if self._prev_env is not None else None
         return e
@@ -412,8 +422,9 @@ class Env(object):
 
         return default
 
-    def set(self, s, v):
-        d = self.search(s, self._globals)
+    def set(self, s, v, is_global=False):
+        default = self._globals if is_global else self._locals
+        d = self.search(s, default)
         d[s] = v
 
     def get(self, s):
@@ -432,6 +443,9 @@ class Env(object):
 
     def __setitem__(self, i, v):
         return self.set(i, v)
+
+    #def __delitem__(self, i):
+    #    del self._globals[i]
 
     def add_builtin(self, tr, s, ar, func):
         args = []
@@ -1004,6 +1018,39 @@ class Test_Eval(unittest.TestCase):
 
         res = eval1(self.env, p)
         self.assertEqual(res, 42)
+
+    def test_callcc2(self):
+        def add(a, b):
+            return Apply(0,0, ESym("+"), [a, b])
+
+        p = ([
+#        p = Apply(0,0, ESym("begin"), [
+
+                Def(0,0, ESym("x"), ENum(0), is_global=True),
+
+                Apply(0,0, ESym("+"), [
+                            ENum(1),
+                            Apply(0,0, ESym("call/cc"), [
+                                    ELambda(EList([ESym("cc")]), [
+                                                Def(0,0, ESym("x"), ESym("cc"), is_global=True),
+                                                add(ENum(2), Apply(0,0, ESym("cc"), [ENum(3)]))
+                                        ])
+                            ])
+                        ]),
+
+                Apply(0,0,ESym("debug"), [ENum(101)]),
+
+                Apply(0,0, ESym("x"), [ENum(5)]),
+
+                Apply(0,0,ESym("debug"), [ENum(102)]),
+
+                Apply(0,0, ESym("x"), [ENum(6)]),
+
+                Apply(0,0, ESym("debug"), [ENil()]),
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([4, 6, 7]))
 
 
 if __name__ == "__main__":

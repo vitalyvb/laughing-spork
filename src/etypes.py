@@ -110,10 +110,11 @@ class List(_Value):
 
 
 class Def(Token):
-    def __init__(self, start, end, sym, exp):
+    def __init__(self, start, end, sym, exp, is_global=False):
         super(Def, self).__init__(start, end)
         self._sym = sym
         self._exp = exp
+        self._is_global = is_global
 
     @classmethod
     def derive(cls, tok, sym, exp):
