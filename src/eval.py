@@ -25,6 +25,15 @@ def ELambda(v, e):
 class EvalRuntimeError(Exception):
     pass
 
+class EvalQuoted(object):
+    pass
+
+Rest = type("Rest", (EvalQuoted,), {})()
+Begin = type("Begin", (EvalQuoted,), {})()
+Call = type("Call", (EvalQuoted,), {})()
+CallCC = type("CallCC", (EvalQuoted,), {})()
+
+
 class Frame(object):
     def __init__(self, env, data, cont):
         self.env = env
@@ -215,26 +224,24 @@ def eval2(vm, stack, env, exp):
         return (res,)
 
     def op_apply(env, exp):
-        if isinstance(exp.sym, Lambda):
-            f = exp.sym
-        else:
-            if exp.sym.v == "begin":
-                return exp.args
+        s_push(env, op_apply2, exp)
+        return exp.sym
 
-            if exp.sym.v == "call/cc":
-                if isinstance(exp.args[0], Lambda):
-                    f = exp.args[0]
-                else:
-                    f = env[exp.args[0].v]
+    def op_apply2(env, f, _cexp, cdata):
 
-                stack0 = deque(stack)
-                env0 = env.copy()
+        if f is Begin:
+            return cdata.args
 
-                cc = Closure((stack0, env0), EList([ESym("&cont")]), callcc)
-                ret = Apply(0,0, exp.args[0], [cc]);
-                return (ret,)
+        if f is CallCC:
+            if len(cdata.args) != 1:
+                raise EvalRuntimeError("call/cc requires 1 argument of lambda(x)")
 
-            f = env[exp.sym.v]
+            stack0 = deque(stack)
+            env0 = env.copy()
+            cc = Closure((stack0, env0), EList([ESym("&cont")]), callcc)
+            # whatever cdata.args[0] is, Apply will evaluate it
+            ret = Apply(0,0, cdata.args[0], [cc]);
+            return (ret,)
 
         for n, x in enumerate(f.params.v):
             if x.v == "&rest":
@@ -247,18 +254,18 @@ def eval2(vm, stack, env, exp):
             argv = None
 
         ctx = (f, args, argv)
-        largs = exp.args
+        largs = cdata.args
 
-        s_push(env, op_apply2, ctx)
+        s_push(env, op_apply3, ctx)
         if isinstance(largs, list):
             return EList(largs)
 
         if isinstance(largs, Sym):
             return EList([largs])
 
-        raise Exception("unexpected arguments type '{}' when calling '{}'".format(largs, exp.sym.v))
+        raise Exception("unexpected arguments type '{}' when calling '{}'".format(largs, f))
 
-    def op_apply2(env, exp, _cexp, cdata):
+    def op_apply3(env, exp, _cexp, cdata):
         (f, args, argv) = cdata
 
         if len(args) > len(exp.v):
@@ -303,7 +310,7 @@ def eval2(vm, stack, env, exp):
             if isinstance(exp, Sym):
                 exp = env[exp.v]
 
-            if isinstance(exp, (Nil, Num, Str, Closure)):
+            if isinstance(exp, (Nil, Num, Str, Closure, EvalQuoted)):
                 break
 
             if isinstance(exp, Apply):
@@ -380,7 +387,10 @@ class Env(object):
         return e
 
     def _init(self):
-        self._globals["&rest"] = type("Rest", (object,), {})
+        self._globals["&rest"] = Rest
+        self._globals["begin"] = Begin
+        self._globals["call"] = Call
+        self._globals["call/cc"] = CallCC
 
     def reset(self, other):
         self._globals = other._globals
@@ -967,6 +977,33 @@ class Test_Eval(unittest.TestCase):
             eval1(self.env, p)
 
         self.assertEqual(display.res, "@-@--@---@----@-----@------")
+
+    def test_call_call(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("d"), ELambda(EList([]), ESym("+"))),
+                Def(0,0, ESym("r"), Apply(0,0, Apply(0,0, ESym("d"), []), [ENum(33),ENum(9)])),
+                ESym("r")
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 42)
+
+    def test_callcc_call(self):
+        def add(s, n):
+            return Apply(0,0, ESym("+"), [ESym(s), ENum(n)])
+
+        p = Apply(0,0, ESym("begin"), [
+                Def(0,0, ESym("cc"), ELambda(EList([ESym("x")]), Apply(0,0,ESym("x"),[ENum(42)]))),
+                Def(0,0, ESym("d"), ELambda(EList([]), ESym("cc"))),
+                Def(0,0, ESym("r"), Apply(0,0, ESym("call/cc"), [Apply(0,0, ESym("d"), [])])),
+                ESym("r")
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 42)
 
 
 if __name__ == "__main__":
