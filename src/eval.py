@@ -129,9 +129,6 @@ class VMEval(object):
 
         stack = deque()
 
-        if isinstance(exp, Apply) and isinstance(exp.sym, Sym) and exp.sym.v == "begin":
-            exp = exp.args
-
         try:
             if isinstance(exp, list):
                 res = []
