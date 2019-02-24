@@ -127,6 +127,9 @@ class VMEval(object):
         if self.recurs > 5:
             print("eval1 recursion level: {}".format(self.recurs))
 
+        if isinstance(exp, Module):
+            exp = exp.v
+
         stack = deque()
 
         try:

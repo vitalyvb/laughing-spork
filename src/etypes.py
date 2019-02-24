@@ -72,6 +72,7 @@ class Sym(_Value):
 class Str(_Value):
     pass
 
+
 def relist(exp):
     if not isinstance(exp, list):
         return exp
@@ -85,13 +86,15 @@ def relist(exp):
 
     return List(s, e, exp, style=("[", "]"))
 
+
 def tag(s, t):
     # tag('    xc v 4', '*') -> '    *xc v 4'
     return reduce(lambda a_c, b: (a_c[0]+a_c[1]+b, ' ') if b != '' else (a_c[0]+' ', a_c[1]), s.split(' '), ("", t))[0]
 
-class List(_Value):
+
+class _List(_Value):
     def __init__(self, *a, style=("","."), **kw):
-        super(List, self).__init__(*a, **kw)
+        super(_List, self).__init__(*a, **kw)
         self._style = style
 
     def format(self, align=lambda x:x):
@@ -99,14 +102,23 @@ class List(_Value):
             return align("[]")
 
         def align2(x):
-            return "    " + align(x)
+            return "  " + align(x)
 
         r = []
-        r.append(align2(self._style[0]))
+        r.append(align(self._style[0]))
         r.extend(x.format(align2) for x in self._v)
-        r.append(align2(self._style[1]))
+        r.append(align(self._style[1]))
 
         return "\n".join(r)
+
+
+class List(_List):
+    pass
+
+
+class Module(_List):
+    def __init__(self, *a, style=("{","}"), **kw):
+        super(Module, self).__init__(*a, style=style, **kw)
 
 
 class Def(Token):

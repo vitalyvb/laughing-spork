@@ -157,7 +157,12 @@ def comp_to_ast(comp):
 
 def parse_to_ast(doc):
     c = yaml.compose(doc)
-    return comp_to_ast(c)
+    ast = comp_to_ast(c)
+    if isinstance(ast, List):
+        res = Module(0,0, ast.v)
+    else:
+        res = Module(0,0, [ast])
+    return res 
 
 
 if __name__ == "__main__":
