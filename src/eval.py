@@ -174,11 +174,12 @@ def eval2(vm, stack, env, exp):
         s_push(env, op_if2, exp)
         return exp.exp
 
-    def op_if2(env, exp, _cexp, cdata):
+    def op_if2(env, exp, _cexp, cdata, frame):
         if not isinstance(exp, Nil):
             exp = cdata.thn
         else:
             exp = cdata.els
+        env.weaken()
         return exp
 
 
@@ -186,7 +187,7 @@ def eval2(vm, stack, env, exp):
         s_push(env, op_def2, exp)
         return exp.exp
 
-    def op_def2(env, exp, _cexp, cdata):
+    def op_def2(env, exp, _cexp, cdata, frame):
         env.set(cdata.sym.v, exp, is_global=cdata._is_global)
         return ENil()
 
@@ -197,7 +198,7 @@ def eval2(vm, stack, env, exp):
         s_push(env, op_list2, (exp, []))
         return exp.v[0]
 
-    def op_list2(env, exp, _cexp, cdata):
+    def op_list2(env, exp, _cexp, cdata, frame):
         cdata, acc = cdata
         acc = acc + [exp]
         if len(acc) >= len(cdata.v):
@@ -210,13 +211,16 @@ def eval2(vm, stack, env, exp):
     def op_pylist(env, exp):
         if len(exp) > 1:
             s_push(env, op_pylist2, (exp, []))
+
+        env.weaken()
         return exp[0]
 
-    def op_pylist2(env, exp, _cexp, cdata):
+    def op_pylist2(env, exp, _cexp, cdata, frame):
         cdata, acc = cdata
         acc = acc + [exp]
 
         if len(acc) >= len(cdata)-1:
+            env.weaken()
             return cdata[len(acc)]
 
         s_push(env, op_pylist2, (cdata, acc))
@@ -227,7 +231,7 @@ def eval2(vm, stack, env, exp):
         (stack0, env0) = envn["&closure"]
 
         s_reset(stack0)
-# XXX        envn.reset(env0)
+#        envn.reset(env0)
 
         return (res,)
 
@@ -235,7 +239,7 @@ def eval2(vm, stack, env, exp):
         s_push(env, op_apply2, exp)
         return exp.sym
 
-    def op_apply2(env, f, _cexp, cdata):
+    def op_apply2(env, f, _cexp, cdata, frame):
 
         if f is Begin:
             return cdata.args
@@ -273,7 +277,7 @@ def eval2(vm, stack, env, exp):
 
         raise Exception("unexpected arguments type '{}' when calling '{}'".format(largs, f))
 
-    def op_apply3(env, exp, _cexp, cdata):
+    def op_apply3(env, exp, _cexp, cdata, frame):
         (f, args, argv) = cdata
 
         if len(args) > len(exp.v):
@@ -282,19 +286,24 @@ def eval2(vm, stack, env, exp):
         if argv is None and len(args) < len(exp.v):
             raise Exception("too many arguments to call {}".format(f))
 
+        alls = list(args)
+        if argv is not None:
+            alls.append(argv)
+
+        if isinstance(f, Closure):
+            env = f.env[1]
+
+        env = Env(prev=env, local=[x.v for x in alls])
+        frame.env = env
+
         for arg, val in zip(args, exp.v):
             env[arg.v] = val
 
         if argv is not None:
             env[argv.v] = EList(exp.v[len(args):])
 
-#        if isinstance(f, Closure):
-#            # why the hell this works at all?
-#            # because of no variable names conflict?
-#            env.update(f.env)
-
         if isinstance(f, Closure):
-            env["&closure"] = f.env
+            env["&closure"] = (f.env[0], env)
 
         return f.exp
 
@@ -353,7 +362,8 @@ def eval2(vm, stack, env, exp):
                 continue
 
             if isinstance(exp, Lambda):
-#                exp = Closure(env.copy(), exp.params, exp.exp)
+                env0 = env.copy()
+                exp = Closure((None, env0), exp.params, exp.exp)
                 break
 
             if isinstance(exp, Def):
@@ -366,20 +376,27 @@ def eval2(vm, stack, env, exp):
             break
 
         frame = s_pop()
+        exp = frame.cont(frame.env, exp, None, frame.data, frame)
         env = frame.env
-        exp = frame.cont(env, exp, None, frame.data)
 
     return exp
 
 
 class Env(object):
     def __init__(self, prev=None, local=None):
-        self._prev_env = prev
+
+        self._weak = False
+
         if prev is None:
             self._globals = {}
             self._init()
         else:
             self._globals = prev._globals
+
+            if prev._weak:
+                prev = prev._prev_env
+
+        self._prev_env = prev
 
         self._locals = {}
         if local is not None:
@@ -402,10 +419,13 @@ class Env(object):
         self._globals["call"] = Call
         self._globals["call/cc"] = CallCC
 
-    def reset(self, other):
-        self._globals = other._globals
-        self._locals = other._locals
-        self._prev_env = other._prev_env
+    #def reset(self, other):
+    #    self._globals = other._globals
+    #    self._locals = other._locals
+    #    self._prev_env = other._prev_env
+
+    def weaken(self):
+        self._weak = True
 
     def search(self, s, default=None):
         # search in all locals, then globals
@@ -423,7 +443,7 @@ class Env(object):
         return default
 
     def set(self, s, v, is_global=False):
-        default = self._globals if is_global else self._locals
+        default = self._globals # if is_global else self._locals
         d = self.search(s, default)
         d[s] = v
 
@@ -800,12 +820,12 @@ class Test_Eval(unittest.TestCase):
                 Def(0,0, ESym("is-even?"), ELambda(EList([ESym("x")]),
                         If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 EList([]),
-                                Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))])))),
+                                Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))]))), is_global=True),
 
                 Def(0,0, ESym("is-odd?"), ELambda(EList([ESym("x")]),
                         If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 ENil(),
-                                Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))])))),
+                                Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))]))), is_global=True),
 
                 EList([
                     Apply(0,0, ESym("is-even?"), [ENum(1000)]),
@@ -976,15 +996,17 @@ class Test_Eval(unittest.TestCase):
 
 
         p = Apply(0,0, ESym("begin"), [
-                Def(0,0, ESym("yin"),
-                    Apply(0,0, 
-                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
-
-                Def(0,0, ESym("yang"),
-                    Apply(0,0, 
-                        ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "-")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
-
-                Apply(0,0, ESym("yin"), [ESym("yang")])
+                Apply(0,0, ELambda(EList([ESym("yin")]), [
+                    Def(0,0, ESym("yin"),
+                        Apply(0,0, 
+                            ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "@")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+                    Apply(0,0, ELambda(EList([ESym("yang")]), [
+                        Def(0,0, ESym("yang"),
+                            Apply(0,0, 
+                                ELambda(EList([ESym("cc")]), [app("display", [Str(0,0, "-")]), ESym("cc") ]), [Apply(0,0,ESym("call/cc"), [ELambda(EList([ESym("c")]), ESym("c")) ])])),
+                        Apply(0,0, ESym("yin"), [ESym("yang")])
+                    ]),[ENum(0)]),
+                ]),[ENum(0)]),
             ])
 
         with self.assertRaises(_MyAbort):
