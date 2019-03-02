@@ -98,7 +98,7 @@ def comp_to_ast(comp):
         print(what, args)
         return ast_apply(s, e, what, args)
 
-    def seq2ast(s, e, items):
+    def seq2ast(s, e, items, top_level=False):
         if len(items) > 0:
             fst = astize(items[0])
             other = map(astize, items[1:])
@@ -111,12 +111,16 @@ def comp_to_ast(comp):
                     return ast_lambda(s, e, items[1:])
                 if fst.v == "call":
                     return ast_call(s, e, list(other))
-                return ast_apply(s, e, Sym.derive(fst, fst.v), list(other))
 
-        return List(s, e, list(map(astize, items)))
+            if top_level:
+                return EvalList(s, e, list(map(astize, items)))
+            else:
+                return ast_apply(s, e, fst, list(other))
+
+        return List(s, e, [])
 
 
-    def astize(item):
+    def astize(item, top_level=False):
         s = item.start_mark
         e = item.end_mark
 
@@ -146,19 +150,19 @@ def comp_to_ast(comp):
             raise ParseError()
 
         if isinstance(item, yaml.SequenceNode):
-            return seq2ast(s, e, item.value)
+            return seq2ast(s, e, item.value, top_level=top_level)
 
         print(s, end='')
         print("-- unexpected yaml node")
         raise ParseError()
 
-    return astize(comp)
+    return astize(comp, top_level=True)
 
 
 def parse_to_ast(doc):
     c = yaml.compose(doc)
     ast = comp_to_ast(c)
-    if isinstance(ast, List):
+    if isinstance(ast, EvalList):
         res = Module(0,0, ast.v)
     else:
         res = Module(0,0, [ast])

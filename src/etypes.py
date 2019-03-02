@@ -116,6 +116,10 @@ class List(_List):
     pass
 
 
+class EvalList(_List):
+    pass
+
+
 class Module(_List):
     def __init__(self, *a, style=("{","}"), **kw):
         super(Module, self).__init__(*a, style=style, **kw)

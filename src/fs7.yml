@@ -1,0 +1,33 @@
+---
+
+#(define flip-flop
+#  ((lambda (state)
+#    (lambda ()
+#      (set! state (not state))
+#      state
+#    )
+#  ) #f)
+#)
+#
+#(flip-flop) <graphic> #t
+#(flip-flop) <graphic> #f
+#(flip-flop) <graphic> #t
+
+- - define
+  - flip-flop
+  - - - lambda
+      - - state
+      - - lambda
+        - []
+        - - define
+          - state
+          - - '+'
+            - state
+            - 1
+        - state
+    - 0
+
+- - flip-flop
+- - flip-flop
+- - flip-flop
+
