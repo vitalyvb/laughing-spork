@@ -1,0 +1,28 @@
+---
+
+- - define
+  - test-prog
+  - - quote
+    - - '+'
+      - x
+      - 1
+
+- - define
+  - test-prog2
+  - - cons
+    - - first
+      - - quote
+        - - define
+          - x
+          - 10
+    - test-prog
+
+- - debug
+  - test-prog
+
+- - debug
+  - test-prog2
+
+- - debug
+  - - eval
+    - test-prog2

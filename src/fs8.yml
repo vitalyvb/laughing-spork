@@ -1,0 +1,20 @@
+---
+
+- - define
+  - test-prog
+  - - quote
+    - - define
+      - x
+      - 10
+    - - '+'
+      - x
+      - 1
+
+- - debug
+  - "<List: [<Def>, <Apply>]>"
+  - test-prog
+
+- - debug
+  - "<Num: 11>"
+  - - eval
+    - test-prog

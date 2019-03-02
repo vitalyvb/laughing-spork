@@ -1,0 +1,45 @@
+---
+
+- - define
+  - test-prog
+  - - quote
+    - - define
+      - x
+      - 10
+    - - '+'
+      - x
+      - 1
+
+- - define
+  - test-prog2
+  - test-prog
+
+- - debug
+  - test-prog2
+
+- - debug
+  - - eval
+    - test-prog2
+
+- - debug
+  - - list
+    - test-prog2
+
+- - debug
+  - - eval
+    - - list
+      - 1
+      - test-prog2
+      - 2
+
+- - define
+  - test-prog3
+  - - quote
+    - undef
+
+- - debug
+  - test-prog3
+
+- - debug
+  - - list
+    - test-prog3
