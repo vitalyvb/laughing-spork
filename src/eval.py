@@ -529,6 +529,8 @@ def get_prelude_env():
         return EList([x]+xs.v)
     define(_id, "cons", ["x", "xs"], _cons)
 
+    define(_id, "list?", ["x"], lambda x: [ENil(), EList([])][isinstance(x, List)] )
+
     return new_env
 
 
@@ -740,6 +742,22 @@ class Test_Eval(unittest.TestCase):
         self.assertEqual(res, [EList([ENum(42)]),
                                EList([ENum(42)]),
                                EList([ENum(42), ENum(1), ENum(2)]) ])
+
+    def test_list7(self):
+        p = [ EList ([
+                Apply(0,0, ESym("list?"), [EList([])]),
+                Apply(0,0, ESym("list?"), [ENil()]),
+                Apply(0,0, ESym("list?"), [EList([ENum(11)])]),
+                Apply(0,0, ESym("list?"), [ENum(22)]),
+
+            ])]
+        res = eval1(self.env, p)
+        self.assertEqual(len(res[0].v), 4)
+        self.assertEqual(res[0].v[0], EList([]))
+        self.assertIsInstance(res[0].v[1], Nil)
+        self.assertEqual(res[0].v[2], EList([]))
+        self.assertIsInstance(res[0].v[3], Nil)
+
 
     def test_lambda1(self):
         p = Apply(0,0, ESym("begin"), [
