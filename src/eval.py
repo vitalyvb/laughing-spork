@@ -37,6 +37,7 @@ Call = type("Call", (EvalQuoted,), {})()
 CallCC = type("CallCC", (EvalQuoted,), {})()
 Eval = type("Eval", (EvalQuoted,), {})()
 Quote = type("Quote", (EvalQuoted,), {})()
+Define = type("Define", (EvalQuoted,), {})()
 
 
 class Frame(object):
@@ -192,11 +193,11 @@ def eval2(vm, stack, env, exp):
 
 
     def op_def(env, exp):
-        s_push(env, op_def2, exp)
+        s_push(env, op_def2, exp.sym)
         return exp.exp
 
     def op_def2(env, exp, _cexp, cdata, frame):
-        env.set(cdata.sym.v, exp, is_global=cdata._is_global)
+        env.set(cdata.v, exp)
         return ENil()
 
 
@@ -248,6 +249,10 @@ def eval2(vm, stack, env, exp):
             f = f.v
         return f
 
+    def op_define(env, f, _cexp, cdata, frame):
+        env.set(cdata.v, f)
+        return (ENil(),)
+
     def op_apply(env, exp):
         s_push(env, op_apply2, exp)
         return exp.sym
@@ -256,6 +261,12 @@ def eval2(vm, stack, env, exp):
 
         if f is Begin:
             return cdata.args
+
+        if f is Define:
+            if len(cdata.args) < 2:
+                raise EvalRuntimeError("define requires 2 arguments or more")
+            s_push(env, op_define, cdata.args[0])
+            return cdata.args[1:]
 
         if f is Eval:
             if len(cdata.args) != 1:
@@ -360,6 +371,10 @@ def eval2(vm, stack, env, exp):
             if isinstance(exp, (Nil, Num, Str, Closure, EvalQuoted, List)):
                 break
 
+            if isinstance(exp, Def_OLD):
+                exp = op_def(env, exp)
+                continue
+
             if isinstance(exp, Apply):
                 exp = op_apply(env, exp)
                 continue
@@ -393,9 +408,6 @@ def eval2(vm, stack, env, exp):
                 exp = Closure((None, env0), exp.params, exp.exp)
                 break
 
-            if isinstance(exp, Def):
-                exp = op_def(env, exp)
-                continue
 
             raise Exception("Eval '{}' not implemented".format(type(exp)))
 
@@ -447,6 +459,7 @@ class Env(object):
         self._globals["call/cc"] = CallCC
         self._globals["eval"] = Eval
         self._globals["quote"] = Quote
+        self._globals["define"] = Define
 
     #def reset(self, other):
     #    self._globals = other._globals
@@ -471,8 +484,8 @@ class Env(object):
 
         return default
 
-    def set(self, s, v, is_global=False):
-        default = self._globals # if is_global else self._locals
+    def set(self, s, v):
+        default = self._globals
         d = self.search(s, default)
         d[s] = v
 
@@ -596,6 +609,16 @@ class Test_Eval(unittest.TestCase):
         p = Apply(0,0, ESym("begin"), [
                 Def(0,0, ESym("a"), ENum(12)),
                 Def(0,0, ESym("a"), ENum(42)),
+                ESym("a")
+            ])
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, 42)
+
+    def test_define2(self):
+        p = Apply(0,0, ESym("begin"), [
+                Apply(0,0, ESym("define"), [ESym("a"), ENum(12)] ),
+                Apply(0,0, ESym("define"), [ESym("a"), ENum(21), ENum(42)] ),
                 ESym("a")
             ])
 
@@ -778,7 +801,6 @@ class Test_Eval(unittest.TestCase):
                 Apply(0,0, ESym("list?"), [EList([])]),
             ])]
         res = eval1(self.env, p)
-        print(res)
         self.assertEqual(len(res[0].v), 5)
         self.assertEqual(res[0].v[0], VList([]))
         self.assertIsInstance(res[0].v[1], Nil)
@@ -934,12 +956,12 @@ class Test_Eval(unittest.TestCase):
                 Def(0,0, ESym("is-even?"), ELambda(EList([ESym("x")]),
                         If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 EList([]),
-                                Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))]))), is_global=True),
+                                Apply(0,0, ESym("is-odd?"), [add("x", ENum(-1))])))),
 
                 Def(0,0, ESym("is-odd?"), ELambda(EList([ESym("x")]),
                         If(0,0, Apply(0,0, ESym("eq?"), [ESym("x"), ENum(0)]),
                                 ENil(),
-                                Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))]))), is_global=True),
+                                Apply(0,0, ESym("is-even?"), [add("x", ENum(-1))])))),
 
                 EList([
                     Apply(0,0, ESym("is-even?"), [ENum(1000)]),
@@ -1190,13 +1212,13 @@ class Test_Eval(unittest.TestCase):
         p = ([
 #        p = Apply(0,0, ESym("begin"), [
 
-                Def(0,0, ESym("x"), ENum(0), is_global=True),
+                Def(0,0, ESym("x"), ENum(0)),
 
                 Apply(0,0, ESym("+"), [
                             ENum(1),
                             Apply(0,0, ESym("call/cc"), [
                                     ELambda(EList([ESym("cc")]), [
-                                                Def(0,0, ESym("x"), ESym("cc"), is_global=True),
+                                                Def(0,0, ESym("x"), ESym("cc")),
                                                 add(ENum(2), Apply(0,0, ESym("cc"), [ENum(3)]))
                                         ])
                             ])

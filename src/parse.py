@@ -27,7 +27,7 @@ def comp_to_ast(comp):
             print(sym.start, end='')
             print("-- first 'define' parameter must be a symbol")
             raise ParseError()
-        return Def(s, e, sym, items[1:])
+        return Def_OLD(s, e, sym, items[1:])
 
     def ast_if(s, e, items):
         l = len(items)
@@ -103,8 +103,8 @@ def comp_to_ast(comp):
             fst = astize(items[0])
             other = map(astize, items[1:])
             if isinstance(fst, Sym):
-                if fst.v == "define":
-                    return ast_define(s, e, list(other))
+#                if fst.v == "define":
+#                    return ast_define(s, e, list(other))
                 if fst.v == "if":
                     return ast_if(s, e, list(other))
                 if fst.v == "lambda":

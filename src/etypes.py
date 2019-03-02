@@ -125,12 +125,12 @@ class Module(_List):
         super(Module, self).__init__(*a, style=style, **kw)
 
 
-class Def(Token):
-    def __init__(self, start, end, sym, exp, is_global=False):
-        super(Def, self).__init__(start, end)
+
+class Def_OLD(Token):
+    def __init__(self, start, end, sym, exp):
+        super(Def_OLD, self).__init__(start, end)
         self._sym = sym
         self._exp = exp
-        self._is_global = is_global
 
     @classmethod
     def derive(cls, tok, sym, exp):
@@ -223,6 +223,28 @@ class Apply(Token):
         else:
             r.append(tag(self._args.format(align2), "*"))
         r.append(align(")"))
+
+        return "\n".join(r)
+
+
+class Def(Apply):
+    def __init__(self, start, end, sym, exp):
+        print(exp)
+        if isinstance(exp, List):
+            exp = exp.v
+        elif not isinstance(exp, list):
+            exp = [exp]
+        super(Def, self).__init__(start, end, Sym(start, start, "define"), [sym]+exp)
+
+    def format(self, align=lambda x:x):
+
+        def align2(x):
+            return "    " + align(x)
+
+        r = []
+        r.append(self._args[0].format(align))
+        r.append(align(":="))
+        r.append(relist(self._args[1:]).format(align2))
 
         return "\n".join(r)
 
