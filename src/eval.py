@@ -514,6 +514,21 @@ def get_prelude_env():
 
     define(_id, "eq?", ["a", "b"], lambda a, b: [ENil(), EList([])][a.v == b.v] )
 
+    define(_id, "list", ["&rest", "args"], lambda args: args )
+
+    def unempty(n):
+        if len(n) == 0:
+            raise EvalRuntimeError("empty list")
+        return n
+    define(_id, "first", ["lst"], lambda lst: unempty(lst.v)[0])
+    define(_id, "rest", ["lst"], lambda lst: EList(unempty(lst.v)[1:]))
+
+    def _cons(x, xs):
+        if isinstance(xs, Nil):
+            return EList([x])
+        return EList([x]+xs.v)
+    define(_id, "cons", ["x", "xs"], _cons)
+
     return new_env
 
 
@@ -675,6 +690,56 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 10)
 
+    def test_list1(self):
+        p = Apply(0,0, ESym("list"), [])
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([]))
+
+    def test_list2(self):
+        p = Apply(0,0, ESym("list"), [ENum(1), ENum(2), ENum(3)])
+        res = eval1(self.env, p)
+        self.assertEqual(res, EList([ENum(1), ENum(2), ENum(3)]))
+
+    def test_list3(self):
+        p = [
+                Def(0,0, ESym("xs"), Apply(0,0, ESym("list"), [ENum(1), ENum(2), ENum(3)])),
+                Apply(0,0, ESym("first"), ESym("xs")),
+                Apply(0,0, ESym("rest"), ESym("xs")),
+                Apply(0,0, ESym("first"), ESym("xs")),
+            ]
+        res = eval1(self.env, p)
+        self.assertEqual(res, [ENum(1), EList([ENum(2), ENum(3)]), ENum(1)])
+
+    def test_list4_raises(self):
+        p = [
+                Def(0,0, ESym("xs"), Apply(0,0, ESym("list"), [])),
+                Apply(0,0, ESym("first"), ESym("xs")),
+            ]
+        with self.assertRaises(EvalRuntimeError):
+            eval1(self.env, p)
+
+    def test_list5_raises(self):
+        p = [
+                Def(0,0, ESym("xs"), Apply(0,0, ESym("list"), [])),
+                Apply(0,0, ESym("rest"), ESym("xs")),
+            ]
+        with self.assertRaises(EvalRuntimeError):
+            eval1(self.env, p)
+
+    def test_list6_cons(self):
+        p = [
+                Def(0,0, ESym("xs"), Apply(0,0, ESym("list"), [])),
+                Apply(0,0, ESym("cons"), [ENum(42),  ESym("xs")]),
+                Apply(0,0, ESym("cons"), [ENum(42),  ENil()]),
+
+                Def(0,0, ESym("xs2"), Apply(0,0, ESym("list"), [ENum(1), ENum(2)])),
+                Apply(0,0, ESym("cons"), [ENum(42),  ESym("xs2")]),
+
+            ]
+        res = eval1(self.env, p)
+        self.assertEqual(res, [EList([ENum(42)]),
+                               EList([ENum(42)]),
+                               EList([ENum(42), ENum(1), ENum(2)]) ])
 
     def test_lambda1(self):
         p = Apply(0,0, ESym("begin"), [
@@ -883,6 +948,34 @@ class Test_Eval(unittest.TestCase):
 
         res = eval1(self.env, p)
         self.assertEqual(res, 22)
+
+    def test_closure3(self):
+
+        p = [
+            Def(0,0, ESym("counter"),
+                Apply(0,0,
+                    ELambda(EList([ESym("state")]),
+                        ELambda(EList([]),
+                            [Def(0,0, ESym("state"), Apply(0,0, ESym("+"), [ESym("state"), ENum(1)])),
+                            ESym("state")]
+                        )
+                    ),
+                    [ENum(0)]),
+            ),
+
+            Def(0,0, ESym("state"), ENum(33)),
+
+            Apply(0,0, ESym("counter"), []),
+            Apply(0,0, ESym("counter"), []),
+
+            Def(0,0, ESym("state"), ENum(22)),
+            Apply(0,0, ESym("counter"), []),
+            Apply(0,0, ESym("counter"), []),
+
+        ]
+
+        res = eval1(self.env, p)
+        self.assertEqual(res, [1,2,3,4])
 
     def test_scope_dyn1(self):
         def add(s, n):
