@@ -245,6 +245,9 @@ def eval2(vm, stack, env, exp):
         env.set("!"+cdata.v, Macro(f))
         return (ENil(),)
 
+    def op_callmacro(env, f, _cexp, cdata, frame):
+        return Apply(0,0, env["!"+cdata.v].exp, list(Apply(0,0, Quote, [x]) for x in f.v))
+
     def op_eif2(env, f, _cexp, cdata, frame):
         if not isinstance(f, Nil):
             exp = cdata[0]
@@ -288,11 +291,9 @@ def eval2(vm, stack, env, exp):
 
         if f is CallMacro:
             if len(cdata.args) != 2:
-                raise EvalRuntimeError("callmacro requires 2 arguments - symbol and args")
+                raise EvalRuntimeError("callmacro requires 2 arguments - symbol and args list")
 
-            return Apply(0,0, env["!"+cdata.args[0].v].exp, list(Apply(0,0, Quote, [x]) for x in env[cdata.args[1].v].v))
-
-            s_push(env, op_macro, cdata.args[0])
+            s_push(env, op_callmacro, cdata.args[0])
             return cdata.args[1]
 
         if f is Eval:

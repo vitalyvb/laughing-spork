@@ -11,11 +11,11 @@
       - '&if'
       - - list
         - expr
-        - - lambda
+        - - '&lambda'
           - []
           - then
 
-        - - lambda
+        - - '&lambda'
           - []
           - else
 
