@@ -36,7 +36,6 @@ Begin = type("Begin", (EvalQuoted,), {})()
 Call = type("Call", (EvalQuoted,), {})()
 CallCC = type("CallCC", (EvalQuoted,), {})()
 Eval = type("Eval", (EvalQuoted,), {})()
-ApplyL = type("ApplyL", (EvalQuoted,), {})()
 Quote = type("Quote", (EvalQuoted,), {})()
 Define = type("Define", (EvalQuoted,), {})()
 EIf = type("EIf", (EvalQuoted,), {})()
@@ -267,10 +266,6 @@ def eval2(vm, stack, env, exp):
         if f is Begin:
             return cdata.args
 
-        if f is ApplyL:
-            print(cdata.args)
-            return Apply(0,0, cdata.args[0], cdata.args[1])
-
         if f is EIf:
             if len(cdata.args) not in (2, 3):
                 raise EvalRuntimeError("&if requires 2 or 3 arguments")
@@ -491,7 +486,6 @@ class Env(object):
         self._globals["define"] = Define
         self._globals["defmacro"] = DefMacro
         self._globals["callmacro"] = CallMacro
-        self._globals["&applyl"] = ApplyL
         self._globals["&if"] = EIf
 
     #def reset(self, other):
