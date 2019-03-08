@@ -1,0 +1,85 @@
+---
+
+- - defmacro
+  - lambda
+
+  - - '&lambda'
+    - - quote
+      - args
+      - code
+
+    - - '&apply'
+      - '&lambda'
+      - - quote
+        - - '&apply.tolist'
+          - args
+        - code
+
+
+- - defmacro
+  - if
+  - - lambda
+    - - expr
+      - then
+      - else
+
+    - - '&apply'
+      - '&if'
+      - - list
+        - expr
+        - - '&lambda'
+          - []
+          - then
+
+        - - '&lambda'
+          - []
+          - else
+
+
+- - defmacro
+  - defun
+  - - lambda
+    - - name
+      - args
+      - '&rest'
+      - code
+
+    - - eval
+      - - '&apply'
+        - define
+        - - list
+          - name
+          - - '&lambda'
+            - - '&apply.tolist'
+              - args
+            - - '&list.eval'
+              - code
+
+
+- - defun
+  - fac'
+  - - x
+    - acc
+  - - if
+    - - eq?
+      - x
+      - 1
+    - acc
+    - - fac'
+      - - '-'
+        - x
+        - 1
+      - - '*'
+        - acc
+        - x
+
+- - defun
+  - fac
+  - - x
+  - - fac'
+    - x
+    - 1
+
+- - fac
+  - 10
+

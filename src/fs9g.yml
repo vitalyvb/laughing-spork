@@ -1,0 +1,52 @@
+---
+
+- - defmacro
+  - lambda
+
+  - - '&lambda'
+    - - quote
+      - args
+      - code
+
+    - - '&apply'
+      - '&lambda'
+      - - quote
+        - - '&apply.tolist'
+          - args
+        - code
+
+
+#- - define
+#  - testa
+#  - - list
+#    - - list
+#      - - quote
+#        - a
+#    - - quote
+#      - 123
+#      - a
+
+#- - define
+#  - test1
+#  - - callmacro
+#    - lambda
+#    - testa
+
+#- - debug
+#  - testa
+
+#- - '&format'
+#  - test1
+
+
+- - define
+  - ff
+  - - lambda
+    - - x
+    - - '+'
+      - x
+      - 2
+
+- - debug
+  - - ff
+    - 5

@@ -47,9 +47,9 @@ def comp_to_ast(comp):
         if len(items) > 0:
             fst = astize(items[0])
             other = map(astize, items[1:])
-            if isinstance(fst, Sym):
-                if fst.v == "lambda":
-                    return ast_lambda(s, e, items[1:])
+#            if isinstance(fst, Sym):
+#                if fst.v == "lambda":
+#                    return ast_lambda(s, e, items[1:])
 
             if top_level:
                 return EvalList(s, e, list(map(astize, items)))
