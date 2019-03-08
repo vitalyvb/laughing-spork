@@ -1,0 +1,94 @@
+---
+
+- - defmacro
+  - lambda
+
+  - - '&lambda'
+    - - quote
+      - args
+      - '&rest'
+      - code
+
+    - - '&apply'
+      - '&lambda'
+      - - quote
+        - - '&apply.tolist'
+          - args
+        - - '&list.eval'
+          - code
+
+
+- - defmacro
+  - if
+  - - lambda
+    - - expr
+      - then
+      - else
+
+    - - '&apply'
+      - '&if'
+      - - list
+        - expr
+        - - '&lambda'
+          - []
+          - then
+
+        - - '&lambda'
+          - []
+          - else
+
+
+- - defmacro
+  - defun
+  - - lambda
+    - - name
+      - args
+      - '&rest'
+      - code
+
+    - - eval
+      - - '&apply'
+        - define
+        - - list
+          - name
+          - - '&lambda'
+            - - '&apply.tolist'
+              - args
+            - - '&list.eval'
+              - code
+
+
+- - defmacro
+  - cond
+
+  - - lambda
+    - - expr
+      - then
+      - '&rest'
+      - cont
+
+    - - '&if'
+      - - empty?
+        - cont
+      - - lambda
+        - []
+
+        - - callmacro
+          - 'if'
+          - - list
+            - expr
+            - then
+            - null
+
+      - - lambda
+        - []
+
+        - - callmacro
+          - 'if'
+          - - list
+            - expr
+            - then
+            - - callmacro
+              - cond
+              - cont
+

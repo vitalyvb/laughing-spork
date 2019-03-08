@@ -365,7 +365,7 @@ def eval2(vm, stack, env, exp):
             raise Exception("not enough arguments to call {}".format(f))
 
         if argv is None and len(args) < len(exp.v):
-            raise Exception("too many arguments to call {}".format(f))
+            raise Exception("too many arguments to call {}, have {}, need {}".format(f, len(exp.v), len(args)))
 
         alls = list(args)
         if argv is not None:
