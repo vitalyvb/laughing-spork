@@ -11,7 +11,7 @@
       - 1
 
 - - debug
-  - "<List: [<Def>, <Apply>]>"
+  - "<List: [<Apply>, <Apply>]>"
   - test-prog
 
 - - debug

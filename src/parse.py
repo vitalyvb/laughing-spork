@@ -98,13 +98,17 @@ def comp_to_ast(comp):
     return astize(comp, top_level=True)
 
 
-def parse_to_ast(doc):
+def parse_to_ast(doc, init=None):
+    if init is None:
+        init = []
+    else:
+        init = init.v
     c = yaml.compose(doc)
     ast = comp_to_ast(c)
     if isinstance(ast, EvalList):
-        res = Module(0,0, ast.v)
+        res = Module(0,0, init+ast.v)
     else:
-        res = Module(0,0, [ast])
+        res = Module(0,0, init+[ast])
     return res 
 
 

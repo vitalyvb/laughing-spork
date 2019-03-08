@@ -8,9 +8,12 @@ def main():
     if len(sys.argv) < 2:
         raise Exception("usage: main.py file.yml")
 
+    init_doc = open("init.yml", "r").read()
+
     doc = open(sys.argv[1], "r").read()
     try:
-        prog = parse_to_ast(doc)
+        init = parse_to_ast(init_doc)
+        prog = parse_to_ast(doc, init=init)
         print("-----------")
         print(prog.format())
         print("-----------")
@@ -21,7 +24,7 @@ def main():
 #    print(prog.args[0].exp.exp[0].format())
 
     env = get_prelude_env()
-    eval1 = VMEval(trace=10)
+    eval1 = VMEval(trace=30)
     try:
         x = eval1(env, prog)
         print("Result = {}".format(x))

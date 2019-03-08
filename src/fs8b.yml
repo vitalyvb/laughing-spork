@@ -2,19 +2,19 @@
 
 - - define
   - test-prog
-  - - quote
-    - - '+'
-      - x
-      - 1
+  - - list
+    - - quote
+      - - '+'
+        - x
+        - 1
 
 - - define
   - test-prog2
   - - cons
-    - - first
-      - - quote
-        - - define
-          - x
-          - 10
+    - - quote
+      - - define
+        - x
+        - 10
     - test-prog
 
 - - debug

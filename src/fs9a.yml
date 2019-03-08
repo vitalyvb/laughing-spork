@@ -13,13 +13,13 @@
           - exp
           - 0
 
-        - - lambda
+        - - '&lambda'
           - []
           - - elem
             - exp
             - 1
 
-        - - lambda
+        - - '&lambda'
           - []
           - - elem
             - exp

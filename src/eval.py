@@ -575,6 +575,7 @@ class Env(object):
             val = ELambda(VList(list(map(ESym, ar))), value)
         elif rawfunc is not None:
             val = rawfunc
+        val.format = lambda align:align(s)
         self._globals[s] = val
 
 
@@ -627,7 +628,12 @@ def get_prelude_env():
     define(_id, "&apply?", ["app"], lambda app: [ENil(), VList([])][isinstance(app, Apply)] )
     define(_id, "&apply.exp", ["app"], lambda app: app.sym )
     define(_id, "&apply.args", ["app"], lambda app: VList(app.args) )
-    define(_id, "&apply.tolist", ["app"], lambda app: VList([app.sym]+app.args) )
+    def _app_tolist(app):
+        # for lambda - empty list in not apply
+        if isinstance(app, Apply):
+            return VList([app.sym]+app.args)
+        return app
+    define(_id, "&apply.tolist", ["app"], _app_tolist )
 
     define(_id, "&list.elist", ["lst"], lambda lst: EList(lst.v) )
     define(_id, "&list.eval", ["lst"], lambda lst: lst.v )
