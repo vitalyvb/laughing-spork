@@ -612,6 +612,10 @@ def get_prelude_env():
     define(_id, "&apply?", ["app"], lambda app: [ENil(), VList([])][isinstance(app, Apply)] )
     define(_id, "&apply.exp", ["app"], lambda app: app.sym )
     define(_id, "&apply.args", ["app"], lambda app: VList(app.args) )
+    define(_id, "&apply.tolist", ["app"], lambda app: VList([app.sym]+app.args) )
+
+    define(_id, "&list.elist", ["lst"], lambda lst: EList(lst.v) )
+    define(_id, "&list.eval", ["lst"], lambda lst: lst.v )
 
     define(_id, "&lambda", ["args", "exp"], lambda args, exp: Lambda(0,0, args, exp) )
 
