@@ -1,8 +1,18 @@
 ---
+
+- - define
+  - call
+  - - lambda
+    - [ f, args ]
+    - - eval
+      - - '&apply'
+        - f
+        - args
+
 - - define
   - apply
   - - lambda
-    - [f, txt, args1]
+    - [f, txt, '&rest', args1]
     - - debug
       - txt
     - - call

@@ -1,0 +1,64 @@
+---
+
+- - define
+  - ifx
+  - - quote
+    - - eq?
+      - 2
+      - 2
+    - 3
+    - 4
+
+- - define
+  - do_if
+  - - lambda
+    - - exp
+
+    - - '&apply'
+      - '&if'
+      - - list
+        - - elem
+          - exp
+          - 0
+
+        - - lambda
+          - []
+          - - elem
+            - exp
+            - 1
+
+        - - lambda
+          - []
+          - - elem
+            - exp
+            - 2
+
+
+
+- - define
+  - ifxx
+  - - do_if
+    - ifx
+
+- - debug
+  - ifxx
+
+- - debug
+  - - '&apply?'
+    - ifxx
+  - - '&apply.exp'
+    - ifxx
+  - - elem
+    - - '&apply.args'
+      - ifxx
+    - 0
+  - - '&apply.exp'
+    - - elem
+      - - '&apply.args'
+        - ifxx
+      - 0
+
+- - debug
+  - - eval
+    - ifxx
+

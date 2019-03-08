@@ -1,0 +1,33 @@
+---
+
+- - defmacro
+  - if
+  - - lambda
+    - - expr
+      - then
+      - else
+
+    - - '&apply'
+      - '&if'
+      - - list
+        - expr
+        - - lambda
+          - []
+          - then
+
+        - - lambda
+          - []
+          - else
+
+- - define
+  - test
+  - - if
+    - - eq?
+      - 2
+      - 2
+    - 3
+    - 4
+
+- - debug
+  - test
+

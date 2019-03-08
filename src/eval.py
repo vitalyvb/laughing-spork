@@ -38,6 +38,13 @@ CallCC = type("CallCC", (EvalQuoted,), {})()
 Eval = type("Eval", (EvalQuoted,), {})()
 Quote = type("Quote", (EvalQuoted,), {})()
 Define = type("Define", (EvalQuoted,), {})()
+EIf = type("EIf", (EvalQuoted,), {})()
+DefMacro = type("DefMacro", (EvalQuoted,), {})()
+
+
+class Macro(object):
+    def __init__(self, exp):
+        self.exp = exp
 
 
 class Frame(object):
@@ -179,28 +186,6 @@ def eval2(vm, stack, env, exp):
         return frame
 
 
-    def op_if(env, exp):
-        s_push(env, op_if2, exp)
-        return exp.exp
-
-    def op_if2(env, exp, _cexp, cdata, frame):
-        if not isinstance(exp, Nil):
-            exp = cdata.thn
-        else:
-            exp = cdata.els
-        env.weaken()
-        return exp
-
-
-    def op_def(env, exp):
-        s_push(env, op_def2, exp.sym)
-        return exp.exp
-
-    def op_def2(env, exp, _cexp, cdata, frame):
-        env.set(cdata.v, exp)
-        return ENil()
-
-
     def op_list(env, exp):
         if len(exp.v) == 0:
             return (VList([]),)
@@ -253,6 +238,20 @@ def eval2(vm, stack, env, exp):
         env.set(cdata.v, f)
         return (ENil(),)
 
+    def op_macro(env, f, _cexp, cdata, frame):
+        env.set("!"+cdata.v, Macro(f))
+        return (ENil(),)
+
+    def op_eif2(env, f, _cexp, cdata, frame):
+        if not isinstance(f, Nil):
+            exp = cdata[0]
+        elif len(cdata) > 1:
+            exp = cdata[1]
+        else:
+            return ENil()
+        env.weaken()
+        return Apply(0,0, exp, [])
+
     def op_apply(env, exp):
         s_push(env, op_apply2, exp)
         return exp.sym
@@ -262,10 +261,22 @@ def eval2(vm, stack, env, exp):
         if f is Begin:
             return cdata.args
 
+        if f is EIf:
+            if len(cdata.args) not in (2, 3):
+                raise EvalRuntimeError("&if requires 2 or 3 arguments")
+            s_push(env, op_eif2, cdata.args[1:])
+            return cdata.args[0]
+
         if f is Define:
             if len(cdata.args) < 2:
                 raise EvalRuntimeError("define requires 2 arguments or more")
             s_push(env, op_define, cdata.args[0])
+            return cdata.args[1:]
+
+        if f is DefMacro:
+            if len(cdata.args) < 2:
+                raise EvalRuntimeError("macro requires 2 arguments - symbol and lambda")
+            s_push(env, op_macro, cdata.args[0])
             return cdata.args[1:]
 
         if f is Eval:
@@ -291,6 +302,9 @@ def eval2(vm, stack, env, exp):
             # whatever cdata.args[0] is, Apply will evaluate it
             ret = Apply(0,0, cdata.args[0], [cc]);
             return ret
+
+        if isinstance(f, Macro):
+            return Apply(0,0, Eval, [Apply(0,0, f.exp, cdata.args)])
 
         for n, x in enumerate(f.params.v):
             if x.v == "&rest":
@@ -365,15 +379,14 @@ def eval2(vm, stack, env, exp):
 
 
             if isinstance(exp, Sym):
-                exp = env[exp.v]
+                if "!"+exp.v in env:
+                    exp = env["!"+exp.v]
+                else:
+                    exp = env[exp.v]
                 break
 
             if isinstance(exp, (Nil, Num, Str, Closure, EvalQuoted, List)):
                 break
-
-            if isinstance(exp, Def_OLD):
-                exp = op_def(env, exp)
-                continue
 
             if isinstance(exp, Apply):
                 exp = op_apply(env, exp)
@@ -397,10 +410,6 @@ def eval2(vm, stack, env, exp):
 
             if isinstance(exp, list):
                 exp = op_pylist(env, exp)
-                continue
-
-            if isinstance(exp, If):
-                exp = op_if(env, exp)
                 continue
 
             if isinstance(exp, Lambda):
@@ -460,6 +469,8 @@ class Env(object):
         self._globals["eval"] = Eval
         self._globals["quote"] = Quote
         self._globals["define"] = Define
+        self._globals["defmacro"] = DefMacro
+        self._globals["&if"] = EIf
 
     #def reset(self, other):
     #    self._globals = other._globals
@@ -525,7 +536,7 @@ class Env(object):
 
         def value(env):
             fargs = list(map(lambda v: env[v], args))
-            return tr(func(*tuple(fargs)))
+            return (tr(func(*tuple(fargs))),)
 
         self._globals[s] = ELambda(VList(list(map(ESym, ar))), value)
 
@@ -570,7 +581,25 @@ def get_prelude_env():
 
     define(_id, "list?", ["x"], lambda x: [ENil(), VList([])][isinstance(x, List)] )
 
+    define(ENum, "length", ["lst"], lambda lst: len(lst.v) )
+
+    define(_id, "elem", ["lst", "idx"], lambda lst, idx: lst.v[idx.v] )
+
+    define(_id, "&apply", ["exp", "args"], lambda exp, args: Apply(0,0, exp, args.v) )
+    define(_id, "&apply?", ["app"], lambda app: [ENil(), VList([])][isinstance(app, Apply)] )
+    define(_id, "&apply.exp", ["app"], lambda app: app.sym )
+    define(_id, "&apply.args", ["app"], lambda app: VList(app.args) )
+
     return new_env
+
+
+def _lmb_If(x):
+    return Lambda(0,0, EList([]), x)
+
+def If(_s, _e, x, t, e=None):
+    if e is None:
+        return Apply(0,0, ESym("&if"), [x, _lmb_If(t)])
+    return Apply(0,0, ESym("&if"), [x, _lmb_If(t), _lmb_If(e)])
 
 
 class Test_Eval(unittest.TestCase):
@@ -741,6 +770,17 @@ class Test_Eval(unittest.TestCase):
         res = eval1(self.env, p)
         self.assertEqual(res, 10)
 
+    def test_if5(self):
+        p = If(0,0, EList([]), ENum(10))
+        res = eval1(self.env, p)
+        self.assertEqual(res, 10)
+
+    def test_if6(self):
+        p = If(0,0, ENil(), ENum(10))
+        res = eval1(self.env, p)
+        self.assertIsInstance(res, Nil)
+
+
     def test_list1(self):
         p = Apply(0,0, ESym("list"), [])
         res = eval1(self.env, p)
@@ -807,6 +847,26 @@ class Test_Eval(unittest.TestCase):
         self.assertEqual(res[0].v[2], VList([]))
         self.assertIsInstance(res[0].v[3], Nil)
         self.assertEqual(res[0].v[4], VList([]))
+
+    def test_list8(self):
+        p = [ EList ([
+                Apply(0,0, ESym("length"), [VList([])]),
+                Apply(0,0, ESym("length"), [VList([1])]),
+                Apply(0,0, ESym("length"), [VList([1,2])]),
+            ])]
+        res = eval1(self.env, p)
+        self.assertEqual(len(res[0].v), 3)
+        self.assertEqual(res[0].v[0], ENum(0))
+        self.assertEqual(res[0].v[1], ENum(1))
+        self.assertEqual(res[0].v[2], ENum(2))
+
+    def test_list9(self):
+        p = [ EList ([
+                Apply(0,0, ESym("elem"), [VList([ENum(1),ENum(2),ENum(3)]), ENum(1)]),
+            ])]
+        res = eval1(self.env, p)
+        self.assertEqual(len(res[0].v), 1)
+        self.assertEqual(res[0].v[0], ENum(2))
 
 
     def test_lambda1(self):
