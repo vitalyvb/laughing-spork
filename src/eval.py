@@ -57,7 +57,7 @@ class Frame(object):
         self.data = data
         self.cont = cont
 
-        if src and src.start:
+        if src and hasattr(src, "start") and src.start:
             self.descr += "{:3d}:{:2d} ".format(src.start.line, src.start.column)
         else:
             self.descr += "       "
@@ -75,10 +75,15 @@ class Stats(object):
     def clear(self):
         self._max_recurs = 0
         self._max_stack = 0
+        self._max_env = 0
 
     def recurs(self, v):
         if v > self._max_recurs:
             self._max_recurs = v
+
+    def envd(self, e):
+        if e._cnt > self._max_env:
+            self._max_env = e._cnt
 
     def stack(self, v):
         if v > self._max_stack:
@@ -87,8 +92,9 @@ class Stats(object):
     def print(self):
         print("---------------")
         print("VM stats:")
-        print("    Max Python recursion:{}".format(self._max_recurs))
-        print("    Max VM stack length:{}".format(self._max_stack))
+        print("    Max Python recursion: {}".format(self._max_recurs))
+        print("    Max VM stack length:  {}".format(self._max_stack))
+        print("    Max VM ENV length:    {}".format(self._max_env))
 
 
 class VMEval(object):
@@ -217,7 +223,7 @@ def eval2(vm, stack, env, exp):
         if len(exp) > 1:
             s_push(env, op_pylist2, (exp, []), descr="pylist:1", src=exp)
 
-        env.weaken()
+#        env.weaken()
         return exp[0]
 
     def op_pylist2(env, exp, _cexp, cdata, frame):
@@ -225,7 +231,7 @@ def eval2(vm, stack, env, exp):
         acc = acc + [exp]
 
         if len(acc) >= len(cdata)-1:
-            env.weaken()
+#            env.weaken()
             return cdata[len(acc)]
 
         s_push(env, op_pylist2, (cdata, acc), descr="pylist:N", src=exp)
@@ -398,6 +404,7 @@ def eval2(vm, stack, env, exp):
                     print("{:12s} - {}".format(x.descr, x))
                 1/0
             vm.stats.stack(len(stack))
+            vm.stats.envd(env)
 
             vm.add_trace_point(exp, env)
 
@@ -455,8 +462,7 @@ def eval2(vm, stack, env, exp):
 
 
 class Env(object):
-    def __init__(self, prev=None, local=None):
-
+    def __init__(self, prev=None, local=None, cnt=1):
         self._weak = False
 
         if prev is None:
@@ -464,6 +470,7 @@ class Env(object):
             self._init()
         else:
             self._globals = prev._globals
+            cnt = prev._cnt + 1
 
             if prev._weak:
                 prev = prev._prev_env
@@ -474,6 +481,8 @@ class Env(object):
         if local is not None:
             for k in local:
                 self._locals[k] = None
+
+        self._cnt = cnt
 
 #    def copy(self, local=None):
 #        return Env(prev=self, local=local)
@@ -545,7 +554,7 @@ class Env(object):
     #def __delitem__(self, i):
     #    del self._globals[i]
 
-    def add_builtin(self, tr, s, ar, func):
+    def add_builtin(self, tr, s, ar, func=None, rawfunc=None):
         args = []
         argv = None
         for i, v in enumerate(ar):
@@ -559,11 +568,14 @@ class Env(object):
         if argv is not None:
             args.append(argv)
 
-        def value(env):
-            fargs = list(map(lambda v: env[v], args))
-            return (tr(func(*tuple(fargs))),)
-
-        self._globals[s] = ELambda(VList(list(map(ESym, ar))), value)
+        if func is not None:
+            def value(env):
+                fargs = list(map(lambda v: env[v], args))
+                return (tr(func(*tuple(fargs))),)
+            val = ELambda(VList(list(map(ESym, ar))), value)
+        elif rawfunc is not None:
+            val = rawfunc
+        self._globals[s] = val
 
 
 def get_prelude_env():
@@ -623,6 +635,23 @@ def get_prelude_env():
     define(_id, "&lambda", ["args", "exp"], lambda args, exp: Lambda(0,0, args, exp) )
 
     define(_id, "&format", ["exp"], lambda exp: (ENil(), print(exp.format()))[0] )
+
+    def eif(env):
+        if not isinstance(env["exp"], Nil):
+            exp = env["fthen"]
+        else:
+            felse = env["felse"].v
+            if len(felse) == 1:
+                exp = felse[0]
+            elif len(felse) > 1:
+                raise EvalRuntimeError("too may elses in if")
+            else:
+                return ENil()
+#        env.weaken()
+        return exp.exp
+#        return Apply(0,0, exp, [])
+
+    define(_id, "&if", ["exp", "fthen", "&rest", "felse"], rawfunc=ELambda(VList(list(map(ESym, ["exp", "fthen", "&rest", "felse"]))),eif) )
 
     return new_env
 
