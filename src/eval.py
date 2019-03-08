@@ -36,11 +36,14 @@ Begin = type("Begin", (EvalQuoted,), {})()
 Call = type("Call", (EvalQuoted,), {})()
 CallCC = type("CallCC", (EvalQuoted,), {})()
 Eval = type("Eval", (EvalQuoted,), {})()
+ApplyL = type("ApplyL", (EvalQuoted,), {})()
 Quote = type("Quote", (EvalQuoted,), {})()
 Define = type("Define", (EvalQuoted,), {})()
 EIf = type("EIf", (EvalQuoted,), {})()
 DefMacro = type("DefMacro", (EvalQuoted,), {})()
+CallMacro = type("CallMacro", (EvalQuoted,), {})()
 
+EIf.format = lambda align: align("EIf")
 
 class Macro(object):
     def __init__(self, exp):
@@ -230,7 +233,7 @@ def eval2(vm, stack, env, exp):
         return (res,)
 
     def op_eval(env, f, _cexp, _cdata, frame):
-        if isinstance(f, List):
+        if isinstance(f, (List, EvalList)):
             f = f.v
         return f
 
@@ -261,6 +264,10 @@ def eval2(vm, stack, env, exp):
         if f is Begin:
             return cdata.args
 
+        if f is ApplyL:
+            print(cdata.args)
+            return Apply(0,0, cdata.args[0], cdata.args[1])
+
         if f is EIf:
             if len(cdata.args) not in (2, 3):
                 raise EvalRuntimeError("&if requires 2 or 3 arguments")
@@ -279,6 +286,15 @@ def eval2(vm, stack, env, exp):
             s_push(env, op_macro, cdata.args[0])
             return cdata.args[1:]
 
+        if f is CallMacro:
+            if len(cdata.args) != 2:
+                raise EvalRuntimeError("callmacro requires 2 arguments - symbol and args")
+
+            return Apply(0,0, env["!"+cdata.args[0].v].exp, list(Apply(0,0, Quote, [x]) for x in env[cdata.args[1].v].v))
+
+            s_push(env, op_macro, cdata.args[0])
+            return cdata.args[1]
+
         if f is Eval:
             if len(cdata.args) != 1:
                 raise EvalRuntimeError("eval requires 1 argument of list()")
@@ -289,6 +305,9 @@ def eval2(vm, stack, env, exp):
         if f is Quote:
             if len(cdata.args) < 1:
                 raise EvalRuntimeError("quote requires at least 1 argument")
+
+            if len(cdata.args) == 1:
+                return (cdata.args[0],)
 
             return (VList(cdata.args),)
 
@@ -304,7 +323,7 @@ def eval2(vm, stack, env, exp):
             return ret
 
         if isinstance(f, Macro):
-            return Apply(0,0, Eval, [Apply(0,0, f.exp, cdata.args)])
+            return Apply(0,0, Eval, [Apply(0,0, f.exp, list(Apply(0,0, Quote, [x]) for x in cdata.args))])
 
         for n, x in enumerate(f.params.v):
             if x.v == "&rest":
@@ -470,6 +489,8 @@ class Env(object):
         self._globals["quote"] = Quote
         self._globals["define"] = Define
         self._globals["defmacro"] = DefMacro
+        self._globals["callmacro"] = CallMacro
+        self._globals["&applyl"] = ApplyL
         self._globals["&if"] = EIf
 
     #def reset(self, other):
@@ -582,6 +603,7 @@ def get_prelude_env():
     define(_id, "list?", ["x"], lambda x: [ENil(), VList([])][isinstance(x, List)] )
 
     define(ENum, "length", ["lst"], lambda lst: len(lst.v) )
+    define(_id, "empty?", ["lst"], lambda lst: [ENil(), VList([])][isinstance(lst, List) and len(lst.v) == 0] )
 
     define(_id, "elem", ["lst", "idx"], lambda lst, idx: lst.v[idx.v] )
 
@@ -590,11 +612,15 @@ def get_prelude_env():
     define(_id, "&apply.exp", ["app"], lambda app: app.sym )
     define(_id, "&apply.args", ["app"], lambda app: VList(app.args) )
 
+    define(_id, "&lambda", ["args", "exp"], lambda args, exp: Lambda(0,0, args, exp) )
+
+    define(_id, "&format", ["exp"], lambda exp: (ENil(), print(exp.format()))[0] )
+
     return new_env
 
 
 def _lmb_If(x):
-    return Lambda(0,0, EList([]), x)
+    return Lambda(0,0, VList([]), x)
 
 def If(_s, _e, x, t, e=None):
     if e is None:

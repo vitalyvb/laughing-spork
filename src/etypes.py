@@ -211,6 +211,38 @@ class Lambda(Token):
         return "\n".join(r)
 
 
-Closure = namedtuple("Closure", ["env", "params", "exp"])
+#Closure = namedtuple("Closure", ["env", "params", "exp"])
 
 
+class Closure(Token):
+
+    def __init__(self, env, params, exp):
+        super(Closure, self).__init__(0, 0)
+        self._env = env
+        self._params = params
+        self._exp = exp
+
+    @property
+    def env(self):
+        return self._env
+
+    @property
+    def params(self):
+        return self._params
+
+    @property
+    def exp(self):
+        return self._exp
+
+    def format(self, align=lambda x:x):
+
+        def align2(x):
+            return "    " + align(x)
+
+        r = []
+        r.append(align("λ<> ") + repr(self._params.v))
+        r.append(align(":="))
+        r.append(relist(self._exp).format(align2))
+        r.append(align("."))
+
+        return "\n".join(r)

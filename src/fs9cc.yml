@@ -1,0 +1,88 @@
+---
+
+- - defmacro
+  - cond
+
+  - - define
+    - do_cond
+
+    - - lambda
+      - - expr
+        - then
+        - '&rest'
+        - cont
+
+      - - '&if'
+        - - empty?
+          - cont
+        - - lambda
+          - []
+          - - '&apply'
+            - '&if'
+            - - list
+              - expr
+              - - '&lambda'
+                - []
+                - then
+
+        - - lambda
+          - []
+
+#          - - debug
+#            - "EXPR:     "
+#            - expr
+#            - "CONT       "
+#            - cont
+
+          - - define
+            - eval_tail
+            - - callmacro
+              - cond
+              - cont
+
+          - - '&apply'
+            - '&if'
+            - - list
+
+              - expr
+
+              - - '&lambda'
+                - []
+                - then
+
+              - - '&lambda'
+                - []
+                - eval_tail
+
+  - do_cond
+
+
+
+- - define
+  - testa
+  - - quote
+    - - eq?
+      - 1
+      - 1
+    - "one"
+
+    - - eq?
+      - 2
+      - 2
+    - "two"
+
+    - - eq?
+      - 3
+      - 3
+    - "three"
+
+- - define
+  - test1
+  - - callmacro
+    - cond
+    - testa
+
+- - '&format'
+  - test1
+
+
