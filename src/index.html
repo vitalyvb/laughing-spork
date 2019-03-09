@@ -1,0 +1,206 @@
+<script type="module">import * as hello from './__target__/main.js'; window.hello = hello;</script>
+<h2>Demo</h2>
+
+<script>
+examples = Array(
+`---
+- - define
+  - val
+  - - '*'
+    - 2
+    - 2
+- val
+`,
+`- - define
+  - count
+  - - - lambda
+      - - state
+      - - lambda
+        - []
+        - - define
+          - state
+          - - '+'
+            - state
+            - 1
+        - state
+    - 0
+
+- - count
+- - count
+- - count
+- - count
+`,
+`---
+
+- - defun
+  - fac'
+  - - x
+    - acc
+  - - if
+    - - eq?
+      - x
+      - 1
+    - acc
+    - - fac'
+      - - '-'
+        - x
+        - 1
+      - - '*'
+        - acc
+        - x
+
+- - defun
+  - fac
+  - - x
+  - - fac'
+    - x
+    - 1
+
+- - fac
+  - 10
+`,
+`---
+- - defun
+  - test
+  - - x
+  - - cond
+    - - eq?
+      - x
+      - 1
+    - "one"
+
+    - - eq?
+      - x
+      - 2
+    - "two"
+
+    - - eq?
+      - x
+      - 3
+    - "three"
+
+    - - eq?
+      - x
+      - 4
+    - "four"
+
+- - test
+  - 1
+- - test
+  - 2
+- - test
+  - 3
+- - test
+  - 4
+
+`,
+`---
+- - define
+  - iter
+  - - lambda
+    - - from
+      - to
+      - f
+    - - if
+      - - eq?
+        - from
+        - to
+      - - f
+        - from
+      - - begin
+        - - f
+          - from
+        - - iter
+          - - '+'
+            - from
+            - 1
+          - to
+          - f
+
+- - define
+  - make-gen
+  - - lambda
+    - - from
+      - to
+    - - define
+      - control-state
+
+      - - lambda
+        - - return
+        - - iter
+          - from
+          - to
+
+          - - lambda
+            - - element
+            - - define
+              - return
+              - - begin
+                - - call/cc
+
+                  - - lambda
+                    - - resume-here
+                    - - define
+                      - control-state
+                      - resume-here
+                    - - return
+                      - element
+
+        - - return
+          - "end"
+
+    - - define
+      - generator
+      - - lambda
+        - []
+        - - call/cc
+          - control-state
+
+    - generator
+
+
+- - define
+  - gen
+  - - make-gen
+    - 0
+    - 2
+
+- - gen
+- - gen
+- - gen
+- - gen
+
+`
+);
+example = function (n) {
+    if (n == 0)
+        txt = window.hello.init_doc;
+    else
+        txt = examples[n-1]
+    document.getElementById('codearea').value = txt;
+}
+</script>
+
+<button onclick="example(1)">Example 1</button>
+<button onclick="example(2)">Example 2</button>
+<button onclick="example(3)">Example 3</button>
+<button onclick="example(4)">Example 4</button>
+<button onclick="example(5)">Example 5</button>
+<button onclick="example(0)">Prelude</button>
+<br/>
+
+<textarea rows="40" cols="70" id="codearea">
+"Hello world!"
+</textarea><br/>
+
+<script>
+run = function () {
+    var c = document.getElementById('codearea').value;
+    document.getElementById('result').innerText = "...";
+    var res = window.hello.main(c);
+    document.getElementById('result').innerText = res;
+}
+</script>
+
+<button onclick="run()">Run!</button><br/>
+<div id="result"></div>

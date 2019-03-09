@@ -64,6 +64,9 @@ def comp_to_ast(comp):
         e = item.end_mark
 
         if isinstance(item, yaml.ScalarNode):
+#            console.log(item.tag)
+#            console.log(item.style)
+#            console.log(item.value)
             # double quotes - always a string
             if item.tag == "tag:yaml.org,2002:str" and item.style == '"':
                 return Str(s, e, item.value)
@@ -89,13 +92,13 @@ def comp_to_ast(comp):
             raise ParseError()
 
         if isinstance(item, yaml.SequenceNode):
-            return seq2ast(s, e, item.value, top_level=top_level)
+            return seq2ast(s, e, item.value, top_level)
 
         print(s, end='')
         print("-- unexpected yaml node")
         raise ParseError()
 
-    return astize(comp, top_level=True)
+    return astize(comp, True)
 
 
 def parse_to_ast(doc, init=None):
@@ -106,9 +109,11 @@ def parse_to_ast(doc, init=None):
     c = yaml.compose(doc)
     ast = comp_to_ast(c)
     if isinstance(ast, EvalList):
-        res = Module(0,0, init+ast.v)
+        init.extend(ast.v)
+        res = Module(0,0, init)
     else:
-        res = Module(0,0, init+[ast])
+        init.append(ast)
+        res = Module(0,0, init)
     return res 
 
 

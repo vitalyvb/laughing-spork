@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 
-from functools import reduce
-from collections import namedtuple
+#from functools import reduce
+#from collections import namedtuple
 
-class Token(object):
+def reduce(func, iterable, res=None):
+    iterator = iter(iterable)
+    if res is None:
+        res = next(iterator)
+    for arg in iterator:
+        res = func(res, arg)
+    return res
+
+class Token1(object):
     def __init__(self, start, end):
         self._start = start
         self._end = end
@@ -33,13 +41,13 @@ class Token(object):
         raise Exception("can't compare {} with {}".format(self.__class__.__name__, other))
 
 
-class Nil(Token):
+class Nil(Token1):
     pass
 
 
-class _Value(Token):
+class _Value(Token1):
     def __init__(self, start, end, v):
-        super(_Value, self).__init__(start, end)
+        super().__init__(start, end)
         self._v = v
 
     @classmethod
@@ -94,7 +102,7 @@ def tag(s, t):
 
 class _List(_Value):
     def __init__(self, *a, style=("","."), **kw):
-        super(_List, self).__init__(*a, **kw)
+        super().__init__(*a)
         self._style = style
 
     def format(self, align=lambda x:x):
@@ -122,13 +130,13 @@ class EvalList(_List):
 
 class Module(_List):
     def __init__(self, *a, style=("{","}"), **kw):
-        super(Module, self).__init__(*a, style=style, **kw)
+        super().__init__(*a, style=style)
 
 
-class Apply(Token):
+class Apply(Token1):
 
     def __init__(self, start, end, sym, args):
-        super(Apply, self).__init__(start, end)
+        super().__init__(start, end)
         self._sym = sym
         self._args = args
 
@@ -163,7 +171,7 @@ class Def(Apply):
             exp = exp.v
         elif not isinstance(exp, list):
             exp = [exp]
-        super(Def, self).__init__(start, end, Sym(start, start, "define"), [sym]+exp)
+        super().__init__(start, end, Sym(start, start, "define"), [sym]+exp)
 
     def format(self, align=lambda x:x):
 
@@ -178,10 +186,10 @@ class Def(Apply):
         return "\n".join(r)
 
 
-class Lambda(Token):
+class Lambda(Token1):
 
     def __init__(self, start, end, params, exp):
-        super(Lambda, self).__init__(start, end)
+        super().__init__(start, end)
         self._params = params
         self._exp = exp
 
@@ -214,10 +222,10 @@ class Lambda(Token):
 #Closure = namedtuple("Closure", ["env", "params", "exp"])
 
 
-class Closure(Token):
+class Closure(Token1):
 
     def __init__(self, env, params, exp):
-        super(Closure, self).__init__(0, 0)
+        super().__init__(0, 0)
         self._env = env
         self._params = params
         self._exp = exp
